@@ -1,0 +1,31 @@
+# Backend API Dockerfile
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json ./
+COPY apps/api ./apps/api
+COPY packages ./packages
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Build packages and API
+RUN npm run build -w @ermas/shared
+RUN npm run build -w @ermas/auth
+RUN npm run build -w @ermas/api
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json ./
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3001
+
+CMD ["node", "dist/apps/api/src/main.js"]

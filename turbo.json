@@ -1,0 +1,37 @@
+{
+  "$schema": "https://turbo.build/json-schema.json",
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "MINIO_ENDPOINT",
+    "JWT_SECRET"
+  ],
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "cache": false
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "outputs": [],
+      "cache": true
+    },
+    "type-check": {
+      "outputs": [],
+      "cache": true
+    },
+    "test": {
+      "outputs": ["coverage/**"],
+      "cache": true
+    },
+    "format": {
+      "outputs": [],
+      "cache": false
+    }
+  }
+}

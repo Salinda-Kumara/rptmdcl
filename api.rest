@@ -1,0 +1,39 @@
+### API Testing Requests
+### Save as requests.rest and use with REST Client extension
+
+### Variables
+@baseUrl = http://localhost:3001/api/v1
+@studentBatch = AA22-105
+@studentNic = 200012345678
+@staffEmail = finance@example.com
+@staffPassword = password123
+
+### Student Login
+POST {{baseUrl}}/auth/student/login
+Content-Type: application/json
+
+{
+  "batchNumber": "{{studentBatch}}",
+  "nic": "{{studentNic}}"
+}
+
+### Staff Login
+POST {{baseUrl}}/auth/staff/login
+Content-Type: application/json
+
+{
+  "email": "{{staffEmail}}",
+  "password": "{{staffPassword}}"
+}
+
+### Get Profile (Protected)
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Refresh Token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "YOUR_REFRESH_TOKEN_HERE"
+}

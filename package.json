@@ -1,0 +1,33 @@
+{
+  "name": "ermas",
+  "version": "1.0.0",
+  "description": "Examination Repeat & Medical Application Management System",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "type-check": "turbo run type-check",
+    "db:migrate": "turbo run db:migrate -w @ermas/api",
+    "db:seed": "turbo run db:seed -w @ermas/api"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.1",
+    "turbo": "^1.10.16",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

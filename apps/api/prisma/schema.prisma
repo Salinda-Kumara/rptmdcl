@@ -1,0 +1,360 @@
+// ERMAS Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== Core User Management ====================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String?  // null for students who use batch/NIC
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  staffUser  StaffUser?
+  student  Student?
+  roles      UserRole[]
+  auditLogs  AuditLog[]
+  remarks    Remark[]
+
+  @@index([email])
+  @@index([deletedAt])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userRoles UserRole[]
+  rolePermissions RolePermission[]
+
+  @@index([name])
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@index([name])
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+// ==================== Student Management ====================
+
+model Student {
+  id                String   @id @default(uuid())
+  batchNumber       String   // e.g., AA22-105
+  nic               String   // National ID Card
+  fullName          String
+  nameWithInitials  String?
+  permanentAddress  String
+  postalAddress     String?
+  telephone         String?
+  mobile            String
+  email             String
+  registrationNumber String  @unique
+  intake            String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  user          User?   @relation(fields: [userId], references: [id])
+  userId        String? @unique
+  batch         Batch?  @relation(fields: [batchNumber, intake], references: [batchNumber, intake])
+  applications  Application[]
+  notifications Notification[]
+
+  @@unique([batchNumber, nic, intake])
+  @@index([email])
+  @@index([registrationNumber])
+  @@index([deletedAt])
+}
+
+model StaffUser {
+  id        String   @id @default(uuid())
+  name      String
+  position  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  @@index([userId])
+}
+
+// ==================== Programme & Subject Management ====================
+
+model Programme {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  batches  Batch[]
+  subjects Subject[]
+
+  @@index([code])
+  @@index([deletedAt])
+}
+
+model Batch {
+  batchNumber String
+  programmeId String
+  intake      String    // e.g., "2022-01"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  programme Programme @relation(fields: [programmeId], references: [id])
+  students  Student[]
+
+  @@id([batchNumber, intake])
+  @@unique([programmeId, batchNumber, intake])
+  @@index([programmeId])
+  @@index([deletedAt])
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  code        String
+  name        String
+  category    String
+  programmeId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  programme           Programme @relation(fields: [programmeId], references: [id])
+  applicationSubjects ApplicationSubject[]
+
+  @@unique([code, programmeId])
+  @@index([programmeId])
+  @@index([deletedAt])
+}
+
+// ==================== Application Management ====================
+
+model Application {
+  id                String   @id @default(uuid())
+  type              String   // MEDICAL, REPEAT
+  status            String   @default("DRAFT") // DRAFT, SUBMITTED, PAYMENT_PENDING, etc.
+  studentId         String
+  totalFee          Int
+  paymentReferenceId String?
+  // Snapshot of the applicant's personal details as entered on THIS application
+  // form. Corrections here do not modify the Student master record.
+  applicantDetails  Json?
+  submittedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  student            Student @relation(fields: [studentId], references: [id])
+  applicationSubjects ApplicationSubject[]
+  payment            Payment?
+  documents          Document[]
+  approvals          Approval[]
+  remarks            Remark[]
+
+  @@index([studentId])
+  @@index([status])
+  @@index([type])
+  @@index([deletedAt])
+}
+
+model ApplicationSubject {
+  id                  String    @id @default(uuid())
+  applicationId       String
+  subjectId           String
+  caMarks             Int?      // CA marks (mandatory per form)
+  category            String    // MEDICAL, REPEAT, 1ST_ATTEMPT (1ST_ATTEMPT for AA only)
+  upcomingExamIntake  String?   // Upcoming exam intake e.g. "2024-06" (DD MM YYYY on form)
+  // Previous exam details (Section 6 of form)
+  previousExamDate    DateTime?
+  previousExamIntake  String?
+  gradeEarned         String?   // For repeat: grade earned in previous attempt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  subject     Subject     @relation(fields: [subjectId], references: [id])
+
+  @@index([applicationId])
+  @@index([subjectId])
+}
+
+// ==================== Payment Management ====================
+
+model Payment {
+  id                String   @id @default(uuid())
+  applicationId     String   @unique
+  amount            Int
+  referenceNumber   String   @unique
+  slipFile          String?  // MinIO path
+  verificationStatus String  @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verifiedBy        String?
+  verifiedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  application Application @relation(fields: [applicationId], references: [id])
+
+  @@index([applicationId])
+  @@index([referenceNumber])
+  @@index([verificationStatus])
+  @@index([deletedAt])
+}
+
+// ==================== Document Management ====================
+
+model Document {
+  id              String   @id @default(uuid())
+  applicationId   String
+  documentType    String   // MEDICAL_CERTIFICATE, PAYMENT_SLIP
+  fileName        String
+  fileSize        Int
+  mimeType        String
+  minioPath       String   // Full path in MinIO
+  uploadedBy      String
+  uploadedAt      DateTime @default(now())
+  deletedAt       DateTime?
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([documentType])
+  @@index([deletedAt])
+}
+
+// ==================== Approval Workflow ====================
+
+model Approval {
+  id            String   @id @default(uuid())
+  applicationId String
+  stage         Int      // 1: Finance, 2: Verification, 3: Exam Manager, etc.
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED, RETURNED
+  approvedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, stage])
+  @@index([status])
+}
+
+model Remark {
+  id            String   @id @default(uuid())
+  applicationId String
+  userId        String
+  content       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@index([applicationId])
+  @@index([userId])
+}
+
+// ==================== Audit & Notifications ====================
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  userId        String
+  action        String
+  entity        String
+  entityId      String
+  details       String?  // JSON stringified
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  studentId String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([read])
+}
+
+// ==================== Examination Schedule ====================
+
+model ExaminationSchedule {
+  id           String   @id @default(uuid())
+  name         String
+  startDate    DateTime
+  endDate      DateTime
+  programmeId  String
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([startDate])
+  @@index([deletedAt])
+}

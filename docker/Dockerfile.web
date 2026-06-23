@@ -1,0 +1,36 @@
+# Frontend Dockerfile
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json ./
+COPY apps/web ./apps/web
+COPY packages ./packages
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Build packages and web app
+RUN npm run build -w @ermas/shared
+RUN npm run build -w @ermas/ui
+RUN npm run build -w @ermas/web
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install serve to run the Next.js app
+RUN npm install -g serve
+
+# Copy built application
+COPY --from=builder /app/apps/web/.next ./apps/web/.next
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder /app/apps/web/package.json ./apps/web/
+
+WORKDIR /app/apps/web
+
+EXPOSE 3000
+
+CMD ["node_modules/.bin/next", "start"]

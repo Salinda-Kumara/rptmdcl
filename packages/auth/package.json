@@ -1,0 +1,17 @@
+{
+  "name": "@ermas/auth",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ermas/shared": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
