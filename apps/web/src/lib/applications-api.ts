@@ -102,9 +102,19 @@ export const applicationsApi = {
     apiClient.get<Application>(`/applications/${id}`).then((r) => r.data),
 };
 
+export interface ExamSchedule {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  programmeId: string;
+  description?: string;
+}
+
 export const studentsApi = {
   getProfile: () => apiClient.get('/students/profile').then((r) => r.data),
   getSubjects: () => apiClient.get<Subject[]>('/students/subjects').then((r) => r.data),
+  getExamSchedules: () => apiClient.get<ExamSchedule[]>('/students/exam-schedules').then((r) => r.data),
 };
 
 export const documentsApi = {
@@ -145,8 +155,9 @@ export const DOC_TYPE_LABELS: Record<DocumentType, string> = {
 export const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Draft',
   SUBMITTED: 'Submitted',
-  PAYMENT_PENDING: 'Payment Pending',
+  PAYMENT_PENDING: 'Payment Verification Pending',
   PAYMENT_VERIFIED: 'Payment Verified',
+  PAYMENT_REJECTED: 'Payment Rejected',
   UNDER_REVIEW: 'Under Review',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
@@ -156,8 +167,9 @@ export const STATUS_LABELS: Record<string, string> = {
 export const STATUS_COLORS: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700',
   SUBMITTED: 'bg-blue-100 text-blue-700',
-  PAYMENT_PENDING: 'bg-yellow-100 text-yellow-700',
-  PAYMENT_VERIFIED: 'bg-cyan-100 text-cyan-700',
+  PAYMENT_PENDING: 'bg-amber-100 text-amber-700',
+  PAYMENT_VERIFIED: 'bg-emerald-100 text-emerald-700',
+  PAYMENT_REJECTED: 'bg-red-100 text-red-700',
   UNDER_REVIEW: 'bg-purple-100 text-purple-700',
   APPROVED: 'bg-green-100 text-green-700',
   REJECTED: 'bg-red-100 text-red-700',

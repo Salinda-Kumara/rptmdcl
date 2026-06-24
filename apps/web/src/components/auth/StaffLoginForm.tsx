@@ -4,6 +4,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/use-auth';
+import { staffApi, rolesOf } from '@/lib/staff-api';
+
+const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
 
 export function StaffLoginForm() {
   const [email, setEmail] = useState('');
@@ -21,7 +24,13 @@ export function StaffLoginForm() {
 
     try {
       await staffLogin({ email, password });
-      router.push('/dashboard/staff');
+      // Route master admins to the admin console, everyone else to the staff portal.
+      let target = '/dashboard/staff';
+      try {
+        const profile = await staffApi.getProfile();
+        if (rolesOf(profile).some((r) => ADMIN_ROLES.includes(r))) target = '/dashboard/admin';
+      } catch { /* fall back to staff portal */ }
+      router.push(target);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {

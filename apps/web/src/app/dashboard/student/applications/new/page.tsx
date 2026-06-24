@@ -13,9 +13,12 @@ import {
   Check,
   UserCheck,
   Info,
+  Search,
+  Plus,
+  X,
 } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
-import { applicationsApi, studentsApi, Subject, ApplicantDetails } from '@/lib/applications-api';
+import { applicationsApi, studentsApi, Subject, ApplicantDetails, ExamSchedule } from '@/lib/applications-api';
 
 type AppType = 'REPEAT' | 'MEDICAL';
 type Category = 'REPEAT' | 'MEDICAL' | '1ST_ATTEMPT';
@@ -25,6 +28,7 @@ interface SelectedSubject {
   category: Category;
   caMarks: string;
   upcomingExamIntake: string;
+  upcomingExamDate: string;
   previousExamDate: string;
   previousExamIntake: string;
   gradeEarned: string;
@@ -95,6 +99,8 @@ export default function NewApplicationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [examSchedules, setExamSchedules] = useState<ExamSchedule[]>([]);
+  const [subjectSearch, setSubjectSearch] = useState('');
 
   // Personal details (pre-filled from the student record; corrections here are
   // saved only on this application, never written back to the master record).
@@ -107,6 +113,8 @@ export default function NewApplicationPage() {
       .then(setSubjects)
       .catch(() => setError('Failed to load subjects'))
       .finally(() => setLoadingSubjects(false));
+
+    studentsApi.getExamSchedules().then(setExamSchedules).catch(() => {});
 
     studentsApi.getProfile()
       .then((p: any) => {
@@ -148,10 +156,23 @@ export default function NewApplicationPage() {
     category: defaultCategoryFor(appType),
     caMarks: '',
     upcomingExamIntake: '',
+    upcomingExamDate: '',
     previousExamDate: '',
     previousExamIntake: '',
     gradeEarned: '',
   });
+
+  // When intake changes, auto-fill the exam date from the matching schedule.
+  const handleIntakeChange = (subjectId: string, intake: string) => {
+    updateField(subjectId, 'upcomingExamIntake', intake);
+    const match = examSchedules.find((s) =>
+      s.name.toLowerCase().includes(intake.toLowerCase()) ||
+      new Date(s.startDate).toISOString().slice(0, 7) === intake.slice(0, 7)
+    );
+    if (match) {
+      updateField(subjectId, 'upcomingExamDate', new Date(match.startDate).toISOString().slice(0, 10));
+    }
+  };
 
   // Changing the application type re-normalizes any already-selected subject
   // categories so they remain valid for the new type.
@@ -205,6 +226,7 @@ export default function NewApplicationPage() {
           category: s.category as any,
           caMarks: Number(s.caMarks),
           upcomingExamIntake: s.upcomingExamIntake || undefined,
+          upcomingExamDate: s.upcomingExamDate || undefined,
           previousExamDate: s.previousExamDate || undefined,
           previousExamIntake: s.previousExamIntake || undefined,
           gradeEarned: s.gradeEarned || undefined,
@@ -220,6 +242,129 @@ export default function NewApplicationPage() {
 
   const feePerSubject = FEES[appType];
   const totalFee = selected.length * feePerSubject;
+
+  // Subjects already chosen (preserve selection order), and the remaining
+  // pool filtered by the search box (matches code or name).
+  const selectedSubjects = selected
+    .map((s) => subjects.find((subj) => subj.id === s.subjectId))
+    .filter((subj): subj is Subject => Boolean(subj));
+
+  const query = subjectSearch.trim().toLowerCase();
+  const availableSubjects = subjects.filter(
+    (subj) =>
+      !selected.some((s) => s.subjectId === subj.id) &&
+      (!query ||
+        subj.code.toLowerCase().includes(query) ||
+        subj.name.toLowerCase().includes(query)),
+  );
+
+  // Detail form shown under each selected subject.
+  const renderSubjectForm = (subject: Subject, sel: SelectedSubject) => (
+    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div>
+        <label className="mb-1 block text-xs font-medium text-slate-600">Category *</label>
+        <select
+          value={sel.category}
+          onChange={(e) => updateField(subject.id, 'category', e.target.value)}
+          className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+        >
+          {CATEGORY_OPTIONS[appType].map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-slate-600">
+          CA Marks <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="number" min={0} max={100} placeholder="0–100"
+          value={sel.caMarks}
+          onChange={(e) => updateField(subject.id, 'caMarks', e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium text-slate-600">Upcoming Exam Intake</label>
+        {examSchedules.length > 0 ? (
+          <select
+            value={sel.upcomingExamIntake}
+            onChange={(e) => handleIntakeChange(subject.id, e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="">— Select intake —</option>
+            {examSchedules.map((s) => (
+              <option key={s.id} value={new Date(s.startDate).toISOString().slice(0, 7)}>
+                {s.name} ({new Date(s.startDate).toISOString().slice(0, 7)})
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text" placeholder="e.g. 2024-06"
+            value={sel.upcomingExamIntake}
+            onChange={(e) => handleIntakeChange(subject.id, e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          />
+        )}
+      </div>
+      <div>
+        <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+          Upcoming Exam Date
+          {sel.upcomingExamDate && (
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">Auto-filled</span>
+          )}
+        </label>
+        <input
+          type="date"
+          value={sel.upcomingExamDate}
+          onChange={(e) => updateField(subject.id, 'upcomingExamDate', e.target.value)}
+          className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+            sel.upcomingExamDate
+              ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
+              : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
+          }`}
+        />
+      </div>
+
+      <div className="sm:col-span-2 lg:col-span-3">
+        <p className="mb-2 border-t border-slate-200 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Previous Examination Details
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Date of Previous Exam</label>
+            <input
+              type="date"
+              value={sel.previousExamDate}
+              onChange={(e) => updateField(subject.id, 'previousExamDate', e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details</label>
+            <input
+              type="text" placeholder="e.g. 2022-01"
+              value={sel.previousExamIntake}
+              onChange={(e) => updateField(subject.id, 'previousExamIntake', e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          {appType === 'REPEAT' && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned</label>
+              <input
+                type="text" placeholder="e.g. C, D, F"
+                value={sel.gradeEarned}
+                onChange={(e) => updateField(subject.id, 'gradeEarned', e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <StudentShell>
@@ -517,103 +662,93 @@ export default function NewApplicationPage() {
                 ))}
               </div>
             ) : (
-              <div className="mt-5 space-y-3">
-                {subjects.map((subject) => {
-                  const sel = selected.find((s) => s.subjectId === subject.id);
-                  return (
-                    <div
-                      key={subject.id}
-                      className={`rounded-xl border p-4 transition-colors ${sel ? 'border-blue-300 bg-blue-50/50' : 'border-slate-200'}`}
-                    >
-                      <label className="flex cursor-pointer items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={!!sel}
-                          onChange={() => toggleSubject(subject.id)}
-                          className="mt-0.5 h-4 w-4 cursor-pointer rounded text-blue-600"
-                        />
-                        <p className="text-sm font-semibold text-slate-900">
-                          <span className="text-blue-600">{subject.code}</span> — {subject.name}
-                        </p>
-                      </label>
-
-                      {sel && (
-                        <div className="ml-7 mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-slate-600">Category *</label>
-                            <select
-                              value={sel.category}
-                              onChange={(e) => updateField(subject.id, 'category', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                            >
-                              {CATEGORY_OPTIONS[appType].map((opt) => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-slate-600">
-                              CA Marks <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="number" min={0} max={100} placeholder="0–100"
-                              value={sel.caMarks}
-                              onChange={(e) => updateField(subject.id, 'caMarks', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-slate-600">Upcoming Exam Intake</label>
-                            <input
-                              type="text" placeholder="e.g. 2024-06"
-                              value={sel.upcomingExamIntake}
-                              onChange={(e) => updateField(subject.id, 'upcomingExamIntake', e.target.value)}
-                              className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                            />
-                          </div>
-
-                          <div className="sm:col-span-2 lg:col-span-3">
-                            <p className="mb-2 border-t border-slate-200 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                              Previous Examination Details
-                            </p>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Date of Previous Exam</label>
-                                <input
-                                  type="date"
-                                  value={sel.previousExamDate}
-                                  onChange={(e) => updateField(subject.id, 'previousExamDate', e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details</label>
-                                <input
-                                  type="text" placeholder="e.g. 2022-01"
-                                  value={sel.previousExamIntake}
-                                  onChange={(e) => updateField(subject.id, 'previousExamIntake', e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                />
-                              </div>
-                              {appType === 'REPEAT' && (
-                                <div>
-                                  <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned</label>
-                                  <input
-                                    type="text" placeholder="e.g. C, D, F"
-                                    value={sel.gradeEarned}
-                                    onChange={(e) => updateField(subject.id, 'gradeEarned', e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                                  />
-                                </div>
-                              )}
+              <>
+                {/* Selected subjects — always visible with their detail forms */}
+                {selectedSubjects.length > 0 && (
+                  <div className="mt-5">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Selected Subjects ({selectedSubjects.length})
+                    </p>
+                    <div className="space-y-3">
+                      {selectedSubjects.map((subject) => {
+                        const sel = selected.find((s) => s.subjectId === subject.id)!;
+                        return (
+                          <div key={subject.id} className="rounded-xl border border-blue-300 bg-blue-50/50 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-sm font-semibold text-slate-900">
+                                <span className="text-blue-600">{subject.code}</span> — {subject.name}
+                              </p>
+                              <button
+                                onClick={() => toggleSubject(subject.id)}
+                                className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                                title="Remove subject"
+                              >
+                                <X className="h-3.5 w-3.5" /> Remove
+                              </button>
                             </div>
+                            {renderSubjectForm(subject, sel)}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                )}
+
+                {/* Search + add available subjects */}
+                <div className="mt-6">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Add Subjects
+                  </p>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={subjectSearch}
+                      onChange={(e) => setSubjectSearch(e.target.value)}
+                      placeholder="Search by subject code or name…"
+                      className="w-full rounded-xl border border-slate-300 py-2.5 pl-9 pr-9 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                    {subjectSearch && (
+                      <button
+                        onClick={() => setSubjectSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-3 max-h-80 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200 p-2">
+                    {availableSubjects.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-slate-400">
+                        {subjects.length === 0
+                          ? 'No subjects available for your programme.'
+                          : query
+                            ? `No subjects match “${subjectSearch}”.`
+                            : 'All subjects have been selected.'}
+                      </p>
+                    ) : (
+                      availableSubjects.map((subject) => (
+                        <button
+                          key={subject.id}
+                          onClick={() => { toggleSubject(subject.id); }}
+                          className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-blue-50"
+                        >
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-400 transition-colors group-hover:border-blue-500 group-hover:bg-blue-600 group-hover:text-white">
+                            <Plus className="h-4 w-4" />
+                          </span>
+                          <span className="text-sm text-slate-700">
+                            <span className="font-semibold text-blue-600">{subject.code}</span> — {subject.name}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    {availableSubjects.length} subject{availableSubjects.length !== 1 ? 's' : ''} available · click to add
+                  </p>
+                </div>
+              </>
             )}
 
             {selected.length > 0 && (
@@ -686,7 +821,8 @@ export default function NewApplicationPage() {
                     </div>
                     <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
                       <span>CA: {s.caMarks}</span>
-                      {s.upcomingExamIntake && <span>Next exam: {s.upcomingExamIntake}</span>}
+                      {s.upcomingExamIntake && <span>Intake: {s.upcomingExamIntake}</span>}
+                      {s.upcomingExamDate && <span>Exam date: {new Date(s.upcomingExamDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })}</span>}
                       {s.previousExamDate && <span>Prev: {s.previousExamDate}</span>}
                       {s.gradeEarned && <span>Grade: {s.gradeEarned}</span>}
                     </div>

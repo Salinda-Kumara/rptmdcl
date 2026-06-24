@@ -6,7 +6,7 @@ import {
   Upload,
   FileText,
   Image as ImageIcon,
-  Download,
+  ExternalLink,
   Trash2,
   AlertCircle,
   Loader2,
@@ -205,26 +205,32 @@ export function DocumentsCard({ applicationId, appType, editable, onDocsChange, 
                   key={doc.id}
                   className="flex items-center gap-3 rounded-lg border border-slate-200 p-3"
                 >
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                      isImage ? 'bg-violet-50 text-violet-600' : 'bg-rose-50 text-rose-600'
-                    }`}
-                  >
-                    <Icon className="h-[18px] w-[18px]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900">{doc.fileName}</p>
-                    <p className="text-xs text-slate-400">
-                      {DOC_TYPE_LABELS[doc.documentType]} · {humanSize(doc.fileSize)}
-                    </p>
-                  </div>
                   <button
                     onClick={() => handleDownload(doc)}
                     disabled={busyId === doc.id}
-                    title="View / download"
-                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-50"
+                    title="Open in new tab"
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:opacity-50"
                   >
-                    {busyId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                        isImage ? 'bg-violet-50 text-violet-600' : 'bg-rose-50 text-rose-600'
+                      }`}
+                    >
+                      {busyId === doc.id ? (
+                        <Loader2 className="h-[18px] w-[18px] animate-spin" />
+                      ) : (
+                        <Icon className="h-[18px] w-[18px]" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-900 hover:text-blue-600 hover:underline">
+                        {doc.fileName}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {DOC_TYPE_LABELS[doc.documentType]} · {humanSize(doc.fileSize)}
+                      </p>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                   </button>
                   {editable && (
                     <button

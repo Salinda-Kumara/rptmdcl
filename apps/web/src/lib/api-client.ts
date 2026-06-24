@@ -47,9 +47,11 @@ apiClient.interceptors.response.use(
           // Refresh failed, clear tokens and redirect to the correct login
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
-          const loginPath = window.location.pathname.startsWith('/dashboard/staff')
-            ? '/login/staff'
-            : '/student';
+          const loginPath =
+            window.location.pathname.startsWith('/dashboard/staff') ||
+            window.location.pathname.startsWith('/dashboard/admin')
+              ? '/login/staff'
+              : '/student';
           window.location.href = loginPath;
         }
       }

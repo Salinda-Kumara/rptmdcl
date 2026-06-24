@@ -56,6 +56,10 @@ export class ApplicationSubjectDto {
 
   @IsOptional()
   @IsDateString()
+  upcomingExamDate?: string; // auto-filled from ExaminationSchedule
+
+  @IsOptional()
+  @IsDateString()
   previousExamDate?: string;
 
   @IsOptional()
@@ -145,6 +149,21 @@ export enum ReviewAction {
 export class ReviewActionDto {
   @IsEnum(ReviewAction)
   action: ReviewAction;
+
+  @IsOptional()
+  @IsString()
+  remark?: string;
+}
+
+// Stage 2 — Finance payment verification.
+export enum PaymentReviewAction {
+  APPROVE = 'APPROVE', // payment confirmed → status PAYMENT_VERIFIED
+  REJECT = 'REJECT', // payment rejected (remark required) → status PAYMENT_REJECTED
+}
+
+export class PaymentReviewDto {
+  @IsEnum(PaymentReviewAction)
+  action: PaymentReviewAction;
 
   @IsOptional()
   @IsString()

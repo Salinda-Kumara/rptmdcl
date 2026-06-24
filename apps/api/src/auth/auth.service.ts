@@ -88,6 +88,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if (user.deletedAt) {
+      throw new UnauthorizedException('This account has been deactivated');
+    }
+
     const isPasswordValid = await argon2.verify(user.password, password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password');

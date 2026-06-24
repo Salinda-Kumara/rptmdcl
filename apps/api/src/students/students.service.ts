@@ -36,4 +36,21 @@ export class StudentsService {
 
     return student.batch?.programme?.subjects ?? [];
   }
+
+  async getExamSchedules(userId: string) {
+    const student = await this.prisma.student.findFirst({
+      where: { userId },
+      include: { batch: { include: { programme: true } } },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+
+    return this.prisma.examinationSchedule.findMany({
+      where: {
+        programmeId: student.batch?.programmeId,
+        deletedAt: null,
+        endDate: { gte: new Date() },
+      },
+      orderBy: { startDate: 'asc' },
+    });
+  }
 }

@@ -64,6 +64,12 @@ async function main() {
     create: { name: 'DIRECTOR', description: 'Director role' },
   });
 
+  const adminRole = await prisma.role.upsert({
+    where: { name: 'ADMIN' },
+    update: {},
+    create: { name: 'ADMIN', description: 'Master administrator role' },
+  });
+
   // Permissions
   const createApplicationPerm = await prisma.permission.upsert({
     where: { name: 'application.create' },
@@ -123,6 +129,13 @@ async function main() {
     { roleId: directorRole.id, permissionId: approveApplicationPerm.id },
     { roleId: directorRole.id, permissionId: reportViewPerm.id },
     { roleId: directorRole.id, permissionId: userManagePerm.id },
+    { roleId: adminRole.id, permissionId: createApplicationPerm.id },
+    { roleId: adminRole.id, permissionId: viewApplicationPerm.id },
+    { roleId: adminRole.id, permissionId: approveApplicationPerm.id },
+    { roleId: adminRole.id, permissionId: verifyPaymentPerm.id },
+    { roleId: adminRole.id, permissionId: scheduleCreatePerm.id },
+    { roleId: adminRole.id, permissionId: reportViewPerm.id },
+    { roleId: adminRole.id, permissionId: userManagePerm.id },
   ];
 
   for (const rp of rolePermissions) {
@@ -263,12 +276,32 @@ async function main() {
     create: { userId: examManagerUser.id, name: 'Exam Manager', position: 'Exam Manager' },
   });
 
+  // Master Admin
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@example.com' },
+    update: { password },
+    create: { email: 'admin@example.com', password },
+  });
+
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: adminUser.id, roleId: adminRole.id } },
+    update: {},
+    create: { userId: adminUser.id, roleId: adminRole.id },
+  });
+
+  await prisma.staffUser.upsert({
+    where: { userId: adminUser.id },
+    update: {},
+    create: { userId: adminUser.id, name: 'Master Admin', position: 'Administrator' },
+  });
+
   console.log('✅ Seed completed!\n');
   console.log('📝 Test Credentials:');
   console.log('  Student - Batch: AA22-105  NIC: 200012345678');
   console.log('  Finance Officer - Email: finance@example.com  Password: password123');
   console.log('  Verification Officer - Email: verification@example.com  Password: password123');
   console.log('  Exam Manager - Email: exammanager@example.com  Password: password123');
+  console.log('  Master Admin - Email: admin@example.com  Password: password123');
 }
 
 main()

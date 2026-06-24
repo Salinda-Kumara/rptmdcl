@@ -6,8 +6,13 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.get<string[]>('roles', context.getHandler());
-    if (!requiredRoles) {
+    // Check the method handler first, then fall back to the controller class so
+    // a class-level @Roles() decorator is honoured too.
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>('roles', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (!requiredRoles || requiredRoles.length === 0) {
       return true;
     }
 

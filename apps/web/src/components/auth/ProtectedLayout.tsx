@@ -17,7 +17,10 @@ export function ProtectedLayout({ children, requiredRole }: ProtectedLayoutProps
   React.useEffect(() => {
     if (!isAuthenticated) {
       // Send students back to /student, staff back to their login
-      const loginPath = pathname?.startsWith('/dashboard/staff') ? '/login/staff' : '/student';
+      const loginPath =
+        pathname?.startsWith('/dashboard/staff') || pathname?.startsWith('/dashboard/admin')
+          ? '/login/staff'
+          : '/student';
       router.push(loginPath);
     }
   }, [isAuthenticated, router, pathname]);

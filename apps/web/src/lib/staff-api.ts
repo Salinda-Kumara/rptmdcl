@@ -41,6 +41,12 @@ export const staffApi = {
       .patch<StaffApplication>(`/applications/${id}/exam-review`, { action, remark })
       .then((r) => r.data),
 
+  // Finance: approve or reject the payment (remark required for reject)
+  financeReview: (id: string, action: 'APPROVE' | 'REJECT', remark?: string) =>
+    apiClient
+      .patch<StaffApplication>(`/applications/${id}/payment-review`, { action, remark })
+      .then((r) => r.data),
+
   // Open a document (staff are allowed to download any application's docs)
   documentUrl: async (documentId: string) => {
     const res = await apiClient.get(`/documents/${documentId}/download`, { responseType: 'blob' });

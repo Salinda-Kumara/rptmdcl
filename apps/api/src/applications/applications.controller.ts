@@ -15,7 +15,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/roles.guard';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { ApplicationsService } from './applications.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto } from './dtos/application.dto';
 
 @ApiTags('Applications')
 @Controller('applications')
@@ -99,5 +99,14 @@ export class ApplicationsController {
   @ApiOperation({ summary: 'Exam Division: reject or forward to finance (staff)' })
   examReview(@Req() req: any, @Param('id') id: string, @Body() dto: ReviewActionDto) {
     return this.applicationsService.examReview(req.user.id, id, dto);
+  }
+
+  // Stage 2 — Finance payment verification.
+  @Patch(':id/payment-review')
+  @UseGuards(RolesGuard)
+  @Roles('FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN')
+  @ApiOperation({ summary: 'Finance: approve or reject payment (staff)' })
+  paymentReview(@Req() req: any, @Param('id') id: string, @Body() dto: PaymentReviewDto) {
+    return this.applicationsService.financeReview(req.user.id, id, dto);
   }
 }

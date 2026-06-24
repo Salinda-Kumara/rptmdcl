@@ -10,9 +10,11 @@ import { STATUS_LABELS, STATUS_COLORS, formatFee } from '@/lib/applications-api'
 const STATUS_FILTERS = [
   { key: '', label: 'All' },
   { key: 'SUBMITTED', label: 'Submitted' },
-  { key: 'UNDER_REVIEW', label: 'Under Review' },
+  { key: 'PAYMENT_PENDING', label: 'Payment Pending' },
+  { key: 'PAYMENT_VERIFIED', label: 'Payment Verified' },
   { key: 'APPROVED', label: 'Approved' },
   { key: 'REJECTED', label: 'Rejected' },
+  { key: 'PAYMENT_REJECTED', label: 'Payment Rejected' },
 ];
 
 export default function StaffApplicationsPage() {

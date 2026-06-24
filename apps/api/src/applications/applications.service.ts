@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto } from './dtos/application.dto';
 
 // Fee structure in LKR (whole rupees, as per the physical form)
 // Medical (re-sit on medical ground): LKR 5,200 per subject
@@ -72,6 +72,7 @@ export class ApplicationsService {
             category: s.category,
             caMarks: s.caMarks,
             upcomingExamIntake: s.upcomingExamIntake,
+            upcomingExamDate: s.upcomingExamDate ? new Date(s.upcomingExamDate) : undefined,
             previousExamDate: s.previousExamDate ? new Date(s.previousExamDate) : undefined,
             previousExamIntake: s.previousExamIntake,
             gradeEarned: s.gradeEarned,
@@ -222,6 +223,72 @@ export class ApplicationsService {
         create: { applicationId: id, stage: 2, status: 'PENDING' }, // Stage 2: Finance payment verification
       }),
     ];
+    if (dto.remark && dto.remark.trim()) {
+      ops.push(
+        this.prisma.remark.create({ data: { applicationId: id, userId, content: dto.remark.trim() } }),
+      );
+    }
+    await this.prisma.$transaction(ops);
+    return this.findOneStaff(id);
+  }
+
+  // Stage 2 — Finance verifies the payment. They may approve (payment confirmed)
+  // or reject (remark required). Status is kept on the application so the staff
+  // list reflects the outcome.
+  async financeReview(userId: string, id: string, dto: PaymentReviewDto) {
+    const application = await this.prisma.application.findFirst({
+      where: { id, deletedAt: null },
+      include: { payment: true },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+    if (application.status !== 'PAYMENT_PENDING') {
+      throw new BadRequestException(
+        'Only applications awaiting payment verification can be reviewed by Finance',
+      );
+    }
+
+    if (dto.action === 'REJECT') {
+      if (!dto.remark || !dto.remark.trim()) {
+        throw new BadRequestException('A remark is required when rejecting a payment');
+      }
+      const ops: any[] = [
+        this.prisma.application.update({ where: { id }, data: { status: 'PAYMENT_REJECTED' } }),
+        this.prisma.approval.updateMany({
+          where: { applicationId: id, stage: 2 },
+          data: { status: 'REJECTED', approvedBy: userId, approvedAt: new Date() },
+        }),
+        this.prisma.remark.create({
+          data: { applicationId: id, userId, content: dto.remark.trim() },
+        }),
+      ];
+      if (application.payment) {
+        ops.push(
+          this.prisma.payment.update({
+            where: { applicationId: id },
+            data: { verificationStatus: 'REJECTED', verifiedBy: userId, verifiedAt: new Date() },
+          }),
+        );
+      }
+      await this.prisma.$transaction(ops);
+      return this.findOneStaff(id);
+    }
+
+    // APPROVE → payment verified.
+    const ops: any[] = [
+      this.prisma.application.update({ where: { id }, data: { status: 'PAYMENT_VERIFIED' } }),
+      this.prisma.approval.updateMany({
+        where: { applicationId: id, stage: 2 },
+        data: { status: 'APPROVED', approvedBy: userId, approvedAt: new Date() },
+      }),
+    ];
+    if (application.payment) {
+      ops.push(
+        this.prisma.payment.update({
+          where: { applicationId: id },
+          data: { verificationStatus: 'VERIFIED', verifiedBy: userId, verifiedAt: new Date() },
+        }),
+      );
+    }
     if (dto.remark && dto.remark.trim()) {
       ops.push(
         this.prisma.remark.create({ data: { applicationId: id, userId, content: dto.remark.trim() } }),

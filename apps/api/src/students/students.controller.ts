@@ -21,4 +21,10 @@ export class StudentsController {
   getSubjects(@Req() req: any) {
     return this.studentsService.getSubjects(req.user.id);
   }
+
+  @Get('exam-schedules')
+  @ApiOperation({ summary: 'Get upcoming exam schedules for student programme' })
+  getExamSchedules(@Req() req: any) {
+    return this.studentsService.getExamSchedules(req.user.id);
+  }
 }

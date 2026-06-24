@@ -87,11 +87,13 @@ model Student {
   nic               String   // National ID Card
   fullName          String
   nameWithInitials  String?
-  permanentAddress  String
+  title             String?  // Mr. / Ms. (from import)
+  gender            String?  // Male / Female (from import)
+  permanentAddress  String?
   postalAddress     String?
   telephone         String?
-  mobile            String
-  email             String
+  mobile            String?
+  email             String?
   registrationNumber String  @unique
   intake            String
   createdAt         DateTime @default(now())
@@ -216,6 +218,7 @@ model ApplicationSubject {
   caMarks             Int?      // CA marks (mandatory per form)
   category            String    // MEDICAL, REPEAT, 1ST_ATTEMPT (1ST_ATTEMPT for AA only)
   upcomingExamIntake  String?   // Upcoming exam intake e.g. "2024-06" (DD MM YYYY on form)
+  upcomingExamDate    DateTime? // Auto-filled from ExaminationSchedule
   // Previous exam details (Section 6 of form)
   previousExamDate    DateTime?
   previousExamIntake  String?
