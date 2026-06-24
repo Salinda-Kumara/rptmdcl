@@ -11,6 +11,15 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
+  async getBatches(): Promise<string[]> {
+    const batches = await this.prisma.batch.findMany({
+      select: { batchNumber: true },
+      distinct: ['batchNumber'],
+      orderBy: { batchNumber: 'desc' },
+    });
+    return batches.map(b => b.batchNumber);
+  }
+
   async studentLogin(studentLoginDto: StudentLoginDto): Promise<AuthResponseDto> {
     const { batchNumber, nic } = studentLoginDto;
 
@@ -38,7 +47,7 @@ export class AuthService {
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          email: student.email,
+          email: student.email || `${student.batchNumber.replace(/\s+/g, '')}-${student.nic}@student.local`.toLowerCase(),
           password: null,
           student: {
             connect: {

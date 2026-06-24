@@ -1,0 +1,242 @@
+[
+  {
+    "code": "BSAA11013",
+    "name": "Financial Accounting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA11023",
+    "name": "Management Fundamentals",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA11032",
+    "name": "Principles of Economics",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA11043",
+    "name": "Financial Mathematics",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA11052",
+    "name": "Business Law",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA11062",
+    "name": "Business Communication & Skill Development I",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA12013",
+    "name": "Information Technology in Business",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA12023",
+    "name": "Cost & Management Accounting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA12033",
+    "name": "Marketing Management",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA12042",
+    "name": "Business Economics",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA12052",
+    "name": "Business Statistics & Forecasting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA12062",
+    "name": "Business Taxation",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA21013",
+    "name": "Financial Reporting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA21023",
+    "name": "Business Processes, Controls & Audits",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA21032",
+    "name": "Human Resource Management",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA21042",
+    "name": "Management Information Systems",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA21053",
+    "name": "Business Finance",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA21062",
+    "name": "Business Communication & Skill Development II",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA22013",
+    "name": "Accounting in Digital Environment",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA22023",
+    "name": "Advanced Management Accounting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA22033",
+    "name": "Audit & Assurance",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA22043",
+    "name": "Operations Management",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA22053",
+    "name": "Corporate Law",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA31013",
+    "name": "Corporate Reporting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA31023",
+    "name": "Digital Business Strategy",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA31033",
+    "name": "Research Methodology",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA31044",
+    "name": "Internship in Accounting I",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA31052",
+    "name": "Skills in Leadership & Innovation",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA32013",
+    "name": "Governance, Ethics and Risk Management",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA32024",
+    "name": "Corporate Taxation",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA32034",
+    "name": "Package Based Data Analysis",
+    "category": "Elective"
+  },
+  {
+    "code": "BSAA32044",
+    "name": "Business Research Project",
+    "category": "Elective"
+  },
+  {
+    "code": "BSAA32054",
+    "name": "Internship in Accounting II",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA41012",
+    "name": "Entrepreneurship",
+    "category": "Elective"
+  },
+  {
+    "code": "BSAA41022",
+    "name": "International Business",
+    "category": "Elective"
+  },
+  {
+    "code": "BSAA41032",
+    "name": "Organizational Behaviour",
+    "category": "Elective"
+  },
+  {
+    "code": "BSAA41043",
+    "name": "Corporate Finance & Risk Management",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA41054",
+    "name": "Internship in Accounting III",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA41063",
+    "name": "Business Intelligence",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA41073",
+    "name": "Business Analytics",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA41083",
+    "name": "Information Security & Fraud Analytics",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA41093",
+    "name": "Forensic Accounting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA41103",
+    "name": "Security Analysis & Business Valuation",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA41113",
+    "name": "Financial Modeling & Forecasting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA42012",
+    "name": "Contemporary Issues in Accounting",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA42023",
+    "name": "Strategic Management",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA42036",
+    "name": "Dissertation",
+    "category": "Core"
+  },
+  {
+    "code": "BSAA42044",
+    "name": "Internship in Accounting IV",
+    "category": "Core"
+  }
+]

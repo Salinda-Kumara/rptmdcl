@@ -15,6 +15,12 @@ export class AuthController {
     return this.authService.studentLogin(studentLoginDto);
   }
 
+  @Get('batches')
+  @ApiOperation({ summary: 'Get list of available batches for student login' })
+  async getBatches(): Promise<string[]> {
+    return this.authService.getBatches();
+  }
+
   @Post('staff/login')
   @ApiOperation({ summary: 'Staff login using email and password' })
   async staffLogin(@Body() staffLoginDto: StaffLoginDto): Promise<AuthResponseDto> {

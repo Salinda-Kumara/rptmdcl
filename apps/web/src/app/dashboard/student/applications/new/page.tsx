@@ -89,6 +89,15 @@ const CATEGORY_OPTIONS: Record<AppType, { value: Category; label: string }[]> = 
 
 const defaultCategoryFor = (type: AppType): Category => (type === 'MEDICAL' ? 'MEDICAL' : 'REPEAT');
 
+function generateInitials(fullName: string): string {
+  if (!fullName) return '';
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length <= 1) return fullName.trim();
+  const lastName = parts.pop();
+  const initials = parts.map(p => p.charAt(0).toUpperCase() + '.').join(' ');
+  return `${initials} ${lastName}`;
+}
+
 export default function NewApplicationPage() {
   const router = useRouter();
 
@@ -118,9 +127,10 @@ export default function NewApplicationPage() {
 
     studentsApi.getProfile()
       .then((p: any) => {
+        const loadedFullName = (p.fullName ?? '').toUpperCase();
         setApplicant({
-          fullName: p.fullName ?? '',
-          nameWithInitials: p.nameWithInitials ?? '',
+          fullName: loadedFullName,
+          nameWithInitials: p.nameWithInitials || generateInitials(loadedFullName),
           registrationNumber: p.registrationNumber ?? '',
           nic: p.nic ?? '',
           batchNumber: p.batchNumber ?? '',
@@ -451,8 +461,15 @@ export default function NewApplicationPage() {
                 <input
                   type="text"
                   value={applicant.fullName}
-                  onChange={(e) => updateApplicant('fullName', e.target.value.toUpperCase())}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  onChange={(e) => {
+                    const upper = e.target.value.toUpperCase();
+                    setApplicant(prev => ({
+                      ...prev,
+                      fullName: upper,
+                      nameWithInitials: generateInitials(upper)
+                    }));
+                  }}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
               </div>
               <div className="sm:col-span-2">

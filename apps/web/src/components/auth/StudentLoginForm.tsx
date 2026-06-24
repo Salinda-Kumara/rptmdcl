@@ -1,15 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/use-auth';
+import apiClient from '@/lib/api-client';
 
 export function StudentLoginForm() {
   const [batchNumber, setBatchNumber] = useState('');
   const [nic, setNic] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [batches, setBatches] = useState<string[]>([]);
+
+  useEffect(() => {
+    apiClient.get<string[]>('/auth/batches')
+      .then(res => setBatches(res.data))
+      .catch(err => console.error('Failed to load batches:', err));
+  }, []);
 
   const { studentLogin } = useAuth();
   const router = useRouter();
@@ -43,8 +51,14 @@ export function StudentLoginForm() {
             value={batchNumber}
             onChange={(e) => setBatchNumber(e.target.value)}
             required
+            list="batch-list"
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none"
           />
+          <datalist id="batch-list">
+            {batches.map((batch) => (
+              <option key={batch} value={batch} />
+            ))}
+          </datalist>
         </div>
 
         <div>

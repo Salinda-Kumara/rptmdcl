@@ -1,0 +1,441 @@
+Bachelor of Science 
+Honours
+ in Applied Accounting degree
+Curriculum 2020
+Course Code
+Title of the subject
+Course Status
+Contact Hours
+Credit Hours
+Notional Hours
+1
+Year I: Semester I
+BSAA 11
+0
+13
+Financial Accounting
+Core
+45
+3
+150
+BSAA 11
+0
+23
+Management Fundamentals
+Core
+45
+3
+150
+BSAA 11
+0
+3
+2
+Principles of Economics
+Core
+30
+2
+10
+0
+BSAA 11
+0
+4
+3
+Financial Mathematics
+Core
+45
+3
+150
+BSAA 11
+0
+5
+2
+Business Law
+Core
+30
+2
+1
+0
+0
+BSAA 11
+0
+6
+2
+Business Communication & Skill Development
+ I
+Core
+30
+2
+1
+0
+0
+Total for the Year I Semester I
+2
+25
+15
+750
+Year I: Semester II
+BSAA 12
+0
+13
+Information Technology in Business
+Core
+45
+3
+150
+BSAA 12
+0
+23
+Cost & Management Accounting
+Core
+45
+3
+150
+BSAA 12
+0
+33
+Marketing Management
+Core
+45
+3
+150
+BSAA 12
+0
+4
+2
+Business Economics
+Core
+30
+2
+10
+0
+BSAA 12
+0
+5
+2
+Business Statistics & Forecasting
+Core
+30
+2
+10
+0
+BSAA 12
+0
+6
+2
+Business Taxation
+Core
+30
+2
+1
+00
+Total for the Year I Semester II 
+2
+25
+15
+750
+Year II: Semester I
+BSAA 21
+0
+13
+Financial Reporting
+Core
+45
+3
+150
+BSAA 21
+0
+23
+Business Processes, Controls & Audits
+Core
+45
+3
+150
+BSAA 21
+0
+32
+Human Resource Management
+Core
+30
+2
+100
+BSAA 21
+0
+42
+Management Information Systems
+Core
+30
+2
+100
+BSAA 21
+0
+53
+Business Finance
+Core
+45
+3
+150
+BSAA 21062
+Business Communication & Skill Development
+ II
+Core
+30
+2
+100
+Total for the Year II Semester I
+225
+15
+750
+Year II: Semester II
+BSAA 22
+0
+13
+Accounting in Digital Environment
+Core
+45
+3
+150
+BSAA 22
+0
+23
+Advanced Management Accounting
+Core
+45
+3
+150
+BSAA 22
+0
+33
+Audit & Assurance
+Core
+45
+3
+150
+BSAA 22
+0
+43
+Operations Management
+Core
+45
+3
+150
+BSAA 22
+0
+53
+Corporate Law
+Core
+45
+3
+150
+Total for the Year II Semester II
+225
+15
+750
+Year III: Semester I
+BSAA 31
+0
+13
+Corporate Reporting
+Core
+45
+3
+150
+BSAA 31023
+Digital Business Strategy
+ 
+Core
+45
+3
+15
+0
+BSAA 31033
+Research
+ Methodology 
+Core
+45
+3
+1
+5
+0
+BSAA 3104
+4
+Internship in Accounting I
+Core
+N/A
+4
+4
+00
+BSAA 31052
+Skills in Leadership & Innovation
+Core
+30
+2
+100
+Total for the Year III Semester I
+16
+5
+15
+9
+50
+Year III: Semester II
+BSAA 32013
+Governance, Ethics and Risk Management
+Core
+45
+3
+15
+0
+BSAA 32024
+Corporate Taxation
+Core
+60
+4
+20
+0
+BSAA 32034
+Package Based Data Analysis
+Elective
+60
+4
+200
+BSAA 32044
+Business Research Project
+ 
+Elective
+BSAA 32
+05
+4
+Internship in Accounting II
+Core
+N/A
+4
+400
+Total for the Year III Semester II
+165
+15
+950
+Year IV: Semester I
+BSAA 41012
+Entrepreneurship 
+Elective
+30
+2
+100
+BSAA 41022
+International Business
+Elective
+BSAA 41032
+Organizational 
+Behaviour
+Elective
+BSAA 410
+43
+Corporate Finance & Risk Management
+Core
+45
+3
+15
+0
+BSAA 4105
+4
+Internship in Accounting III
+Core
+N/A
+4
+400
+ 
+Major in Business Analytics
+BSAA 
+4106
+3
+Business 
+Intelligence
+Core
+45
+3
+150
+BSAA 4107
+3
+Business Analytics
+Core
+45
+3
+150
+ 
+Major in Forensic Accounting
+BSAA 4108
+3
+Information Security & Fraud Analytics
+Core
+45
+3
+150
+BSAA 4109
+3
+Forensic Accounting
+Core
+45
+3
+150
+ 
+Major in Financial Analysis
+ 
+ 
+ 
+ 
+BSAA 4110
+3
+Security Analysis & Business Valuation
+Core
+45
+3
+150
+BSAA 4111
+3
+Financial Modeling & Forecasting
+Core
+45
+3
+150
+Total for the Year IV Semester I
+165
+15
+950
+Year IV: Semester II
+BSAA 42012
+Contemporary Issues in Accounting
+Core
+30
+2
+10
+0
+BSAA 42023
+Strategic Management
+Core 
+45
+3
+150
+BSAA 4203
+6
+Dissertation
+Core
+N/A
+6
+300
+BSAA 4204
+4
+Internship in Accounting IV
+Core
+N/A
+4
+400
+Total for the Year IV Semester II
+75
+15
+950
+Total for the Degree 
+Programme
+1470
+120
+6
+8
+00
