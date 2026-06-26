@@ -14,24 +14,24 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { StaffShell } from '@/components/staff/StaffShell';
-import { staffApi, StaffStats, StaffApplication, formatLKR, rolesOf } from '@/lib/staff-api';
+import { staffApi, StaffStats, StaffApplication, formatLKR } from '@/lib/staff-api';
+import { useMyPermissions, can } from '@/lib/permissions';
 import { STATUS_LABELS, STATUS_COLORS, formatFee } from '@/lib/applications-api';
 
 export default function StaffDashboard() {
+  const { isAdmin, permissions } = useMyPermissions();
   const [stats, setStats] = useState<StaffStats | null>(null);
   const [queue, setQueue] = useState<StaffApplication[]>([]);
-  const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       staffApi.getStats().then(setStats).catch(() => {}),
       staffApi.getApplications({ status: 'SUBMITTED' }).then((a) => setQueue(a.slice(0, 6))).catch(() => {}),
-      staffApi.getProfile().then((u) => setRoles(rolesOf(u))).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
-  const isFinance = roles.includes('FINANCE_OFFICER') || roles.includes('SUPER_ADMIN');
+  const isFinance = isAdmin || can(permissions, 'payments', 'FULL');
 
   const statCards = [
     { label: 'Total Applications', value: stats?.total, icon: FileText, ring: 'bg-indigo-50 text-indigo-600', tint: 'from-indigo-500 to-violet-500' },

@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { StudentLoginDto, StaffLoginDto, AuthResponseDto, RefreshTokenDto } from './dtos/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { effectivePermissions } from './permissions';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -40,6 +41,8 @@ export class AuthController {
   getProfile(@Req() req: any) {
     return {
       user: req.user,
+      isAdmin: !!req.user?.isAdmin,
+      permissions: effectivePermissions(req.user),
     };
   }
 }

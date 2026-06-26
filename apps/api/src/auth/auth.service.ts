@@ -28,13 +28,7 @@ export class AuthService {
         batchNumber,
         nic,
       },
-      include: {
-        user: {
-          include: {
-            roles: { include: { role: true } },
-          },
-        },
-      },
+      include: { user: true },
     });
 
     if (!student) {
@@ -43,36 +37,16 @@ export class AuthService {
 
     let user = student.user;
 
-    // Create user account if doesn't exist
+    // Create the user account on first login. Student identity is implied by the
+    // `student` relation — no role assignment needed under PBAC.
     if (!user) {
       user = await this.prisma.user.create({
         data: {
           email: student.email || `${student.batchNumber.replace(/\s+/g, '')}-${student.nic}@student.local`.toLowerCase(),
           password: null,
-          student: {
-            connect: {
-              id: student.id,
-            },
-          },
-        },
-        include: {
-          roles: { include: { role: true } },
+          student: { connect: { id: student.id } },
         },
       });
-
-      // Assign student role if not exists
-      const studentRole = await this.prisma.role.findUnique({
-        where: { name: 'STUDENT' },
-      });
-
-      if (studentRole) {
-        await this.prisma.userRole.create({
-          data: {
-            userId: user.id,
-            roleId: studentRole.id,
-          },
-        });
-      }
     }
 
     return this.generateAuthTokens(user, student.fullName);
@@ -83,14 +57,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: {
-        roles: {
-          include: {
-            role: true,
-          },
-        },
-        staffUser: true,
-      },
+      include: { staffUser: true },
     });
 
     if (!user || !user.password) {

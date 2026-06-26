@@ -4,9 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/use-auth';
-import { staffApi, rolesOf } from '@/lib/staff-api';
-
-const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
+import { staffApi } from '@/lib/staff-api';
 
 export function StaffLoginForm() {
   const [email, setEmail] = useState('');
@@ -28,7 +26,7 @@ export function StaffLoginForm() {
       let target = '/dashboard/staff';
       try {
         const profile = await staffApi.getProfile();
-        if (rolesOf(profile).some((r) => ADMIN_ROLES.includes(r))) target = '/dashboard/admin';
+        if (profile?.isAdmin) target = '/dashboard/admin';
       } catch { /* fall back to staff portal */ }
       router.push(target);
     } catch (err: any) {

@@ -17,47 +17,42 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
-import { staffApi, rolesOf, ROLE_LABELS } from '@/lib/staff-api';
+import { useMyPermissions, can } from '@/lib/permissions';
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   exact?: boolean;
-  roles?: string[]; // visible only to these roles (undefined = all staff)
+  resource?: string; // visible when the user can VIEW this resource
+  adminOnly?: boolean;
 }
 
 const NAV: NavItem[] = [
   { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/staff/applications', label: 'Applications', icon: FileText },
-  { href: '/dashboard/staff/payments', label: 'Payments', icon: Wallet, roles: ['FINANCE_OFFICER', 'SUPER_ADMIN'] },
-  { href: '/dashboard/staff/schedules', label: 'Schedules', icon: CalendarDays, roles: ['SCHEDULE_OFFICER', 'EXAM_MANAGER', 'SUPER_ADMIN'] },
-  { href: '/dashboard/staff/reports', label: 'Reports', icon: BarChart3, roles: ['REGISTRAR', 'DIRECTOR', 'SUPER_ADMIN'] },
-  { href: '/dashboard/admin', label: 'Admin Console', icon: Crown, roles: ['ADMIN', 'SUPER_ADMIN'] },
+  { href: '/dashboard/staff/applications', label: 'Applications', icon: FileText, resource: 'applications' },
+  { href: '/dashboard/staff/payments', label: 'Payments', icon: Wallet, resource: 'payments' },
+  { href: '/dashboard/staff/schedules', label: 'Schedules', icon: CalendarDays, resource: 'schedules' },
+  { href: '/dashboard/staff/reports', label: 'Reports', icon: BarChart3, resource: 'reports' },
+  { href: '/dashboard/admin', label: 'Admin Console', icon: Crown, adminOnly: true },
 ];
 
 export function StaffShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
-  const [roles, setRoles] = useState<string[]>([]);
-  const [name, setName] = useState<string>('');
+  const { isAdmin, permissions, name } = useMyPermissions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
-    staffApi.getProfile()
-      .then((u) => {
-        setRoles(rolesOf(u));
-        setName(u?.staffUser?.name || u?.email || '');
-      })
-      .catch(() => {});
-  }, []);
-
-  const visibleNav = NAV.filter((n) => !n.roles || n.roles.some((r) => roles.includes(r)));
+  const visibleNav = NAV.filter((n) => {
+    if (n.adminOnly) return isAdmin;
+    if (!n.resource) return true;
+    return isAdmin || can(permissions, n.resource, 'VIEW');
+  });
   const isActive = (item: NavItem) => (item.exact ? pathname === item.href : pathname.startsWith(item.href));
 
   const displayName = name || user?.name || user?.email || 'Staff';
   const initials = displayName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-  const roleLabel = roles.map((r) => ROLE_LABELS[r] || r).join(', ');
+  const roleLabel = isAdmin ? 'Master Admin' : 'Staff';
 
   const SidebarContent = () => (
     <>

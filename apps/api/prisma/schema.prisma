@@ -15,68 +15,39 @@ model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String?  // null for students who use batch/NIC
+  isAdmin   Boolean  @default(false) // Master Admin — full access bypass
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
 
   // Relations
-  staffUser  StaffUser?
-  student  Student?
-  roles      UserRole[]
-  auditLogs  AuditLog[]
-  remarks    Remark[]
+  staffUser   StaffUser?
+  student     Student?
+  permissions UserPermission[]
+  auditLogs   AuditLog[]
+  remarks     Remark[]
 
   @@index([email])
   @@index([deletedAt])
 }
 
-model Role {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  userRoles UserRole[]
-  rolePermissions RolePermission[]
-
-  @@index([name])
+// Per-user, per-feature access level. Absence of a row = no access (None).
+enum AccessLevel {
+  VIEW // read-only
+  FULL // read + write
 }
 
-model Permission {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  rolePermissions RolePermission[]
-
-  @@index([name])
-}
-
-model UserRole {
+model UserPermission {
   userId    String
-  roleId    String
-  createdAt DateTime @default(now())
+  resource  String      // feature key, e.g. "applications", "payments"
+  level     AccessLevel
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@id([userId, roleId])
-  @@index([roleId])
-}
-
-model RolePermission {
-  roleId       String
-  permissionId String
-  createdAt    DateTime @default(now())
-
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@id([roleId, permissionId])
-  @@index([permissionId])
+  @@id([userId, resource])
+  @@index([userId])
 }
 
 // ==================== Student Management ====================

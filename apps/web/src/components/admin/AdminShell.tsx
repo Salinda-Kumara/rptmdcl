@@ -20,48 +20,39 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
-import { staffApi, rolesOf } from '@/lib/staff-api';
-import { ROLE_LABELS } from '@/lib/admin-api';
+import { useMyPermissions, can, AccessLevel } from '@/lib/permissions';
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   exact?: boolean;
+  resource?: string; // visible when the user can VIEW this resource (admins see all)
 }
 
 const NAV: NavItem[] = [
   { href: '/dashboard/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/admin/users', label: 'Staff & Roles', icon: Users },
-  { href: '/dashboard/admin/students', label: 'Student Import', icon: UserSquare2 },
-  { href: '/dashboard/admin/student-manage', label: 'Student Manage', icon: UserCog },
-  { href: '/dashboard/admin/programmes', label: 'Programmes', icon: GraduationCap },
-  { href: '/dashboard/admin/subjects', label: 'Subjects', icon: BookOpen },
-  { href: '/dashboard/admin/batches', label: 'Batches', icon: Layers },
-  { href: '/dashboard/admin/schedules', label: 'Exam Schedules', icon: CalendarDays },
-  { href: '/dashboard/staff/applications', label: 'Applications', icon: FileText },
+  { href: '/dashboard/admin/users', label: 'Staff & Permissions', icon: Users, resource: 'users' },
+  { href: '/dashboard/admin/students', label: 'Student Import', icon: UserSquare2, resource: 'students' },
+  { href: '/dashboard/admin/student-manage', label: 'Student Manage', icon: UserCog, resource: 'students' },
+  { href: '/dashboard/admin/programmes', label: 'Programmes', icon: GraduationCap, resource: 'programmes' },
+  { href: '/dashboard/admin/subjects', label: 'Subjects', icon: BookOpen, resource: 'subjects' },
+  { href: '/dashboard/admin/batches', label: 'Batches', icon: Layers, resource: 'batches' },
+  { href: '/dashboard/admin/schedules', label: 'Exam Schedules', icon: CalendarDays, resource: 'schedules' },
+  { href: '/dashboard/staff/applications', label: 'Applications', icon: FileText, resource: 'applications' },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
-  const [roles, setRoles] = useState<string[]>([]);
-  const [name, setName] = useState('');
+  const { isAdmin, permissions, name } = useMyPermissions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
-    staffApi.getProfile()
-      .then((u) => {
-        setRoles(rolesOf(u));
-        setName(u?.staffUser?.name || u?.email || '');
-      })
-      .catch(() => {});
-  }, []);
-
+  const visibleNav = NAV.filter((n) => !n.resource || isAdmin || can(permissions, n.resource, 'VIEW' as AccessLevel));
   const isActive = (item: NavItem) => (item.exact ? pathname === item.href : pathname.startsWith(item.href));
   const displayName = name || user?.name || user?.email || 'Admin';
   const initials = displayName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-  const roleLabel = roles.map((r) => ROLE_LABELS[r] || r).join(', ');
+  const roleLabel = isAdmin ? 'Master Admin' : 'Staff';
 
   const SidebarContent = () => (
     <>
@@ -76,7 +67,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {NAV.map((item) => {
+        {visibleNav.map((item) => {
           const active = isActive(item);
           const Icon = item.icon;
           return (

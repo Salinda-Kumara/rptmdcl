@@ -9,11 +9,9 @@ import {
   ClipboardCheck, Image as ImageIcon, ChevronDown, BookOpen, Wallet,
 } from 'lucide-react';
 import { StaffShell } from '@/components/staff/StaffShell';
-import { staffApi, StaffApplication, rolesOf } from '@/lib/staff-api';
+import { staffApi, StaffApplication } from '@/lib/staff-api';
+import { useMyPermissions, can } from '@/lib/permissions';
 import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS } from '@/lib/applications-api';
-
-const EXAM_DIVISION_ROLES = ['VERIFICATION_OFFICER', 'EXAM_MANAGER', 'SUPER_ADMIN', 'ADMIN'];
-const FINANCE_ROLES = ['FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN'];
 
 const APPLICANT_FIELDS: { key: string; label: string }[] = [
   { key: 'fullName',           label: 'Full Name' },
@@ -161,8 +159,8 @@ function FieldRow({ label, value, on, onToggle, canVerify }: {
 /* ═══════════════════════════ Page ═══════════════════════════ */
 export default function StaffApplicationReviewPage() {
   const { id } = useParams<{ id: string }>();
+  const { isAdmin, permissions } = useMyPermissions();
   const [app, setApp]       = useState<StaffApplication | null>(null);
-  const [roles, setRoles]   = useState<string[]>([]);
   const [loading, setLoading]   = useState(true);
   const [remark, setRemark]     = useState('');
   const [acting, setActing]     = useState<'FORWARD' | 'REJECT' | null>(null);
@@ -175,15 +173,12 @@ export default function StaffApplicationReviewPage() {
   useEffect(() => {
     staffApi.getApplication(id)
       .then(setApp).catch(() => setError('Not found')).finally(() => setLoading(false));
-    staffApi.getProfile().then((u) => setRoles(rolesOf(u))).catch(() => {});
   }, [id]);
 
   useEffect(() => { setVerified(new Set()); }, [id]);
 
-  const isExam    = roles.some((r) => EXAM_DIVISION_ROLES.includes(r));
-  const canReview = isExam && app?.status === 'SUBMITTED';
-  const isFinance = roles.some((r) => FINANCE_ROLES.includes(r));
-  const canFinance = isFinance && app?.status === 'PAYMENT_PENDING';
+  const canReview = (isAdmin || can(permissions, 'applications', 'FULL')) && app?.status === 'SUBMITTED';
+  const canFinance = (isAdmin || can(permissions, 'payments', 'FULL')) && app?.status === 'PAYMENT_PENDING';
 
   // Details were already verified by the Exam Division once the app moves past
   // SUBMITTED. In that case finance (and later viewers) see them as read-only,

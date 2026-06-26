@@ -14,18 +14,20 @@ export interface AdminStats {
   verifiedRevenue: number;
 }
 
-export interface Role {
-  id: string;
-  name: string;
-  description?: string;
+export type AccessLevel = 'VIEW' | 'FULL';
+
+export interface PermissionGrant {
+  resource: string;
+  level: AccessLevel;
 }
 
 export interface AdminUser {
   id: string;
   email: string;
+  isAdmin: boolean;
   createdAt: string;
   staffUser?: { name: string; position: string } | null;
-  roles: { role: { id: string; name: string } }[];
+  permissions: { resource: string; level: AccessLevel }[];
 }
 
 export interface AdminProgramme {
@@ -100,12 +102,11 @@ export interface ImportResult {
 export const adminApi = {
   getStats: () => apiClient.get<AdminStats>('/admin/stats').then((r) => r.data),
 
-  // Users
-  listRoles: () => apiClient.get<Role[]>('/admin/roles').then((r) => r.data),
+  // Users & permissions
   listUsers: () => apiClient.get<AdminUser[]>('/admin/users').then((r) => r.data),
-  createUser: (data: { email: string; password: string; name: string; position: string; roles: string[] }) =>
+  createUser: (data: { email: string; password: string; name: string; position: string; isAdmin?: boolean; permissions?: PermissionGrant[] }) =>
     apiClient.post<AdminUser>('/admin/users', data).then((r) => r.data),
-  updateUser: (id: string, data: { name?: string; position?: string; password?: string; roles?: string[] }) =>
+  updateUser: (id: string, data: { name?: string; position?: string; password?: string; isAdmin?: boolean; permissions?: PermissionGrant[] }) =>
     apiClient.patch<AdminUser>(`/admin/users/${id}`, data).then((r) => r.data),
   deactivateUser: (id: string) => apiClient.delete(`/admin/users/${id}`).then((r) => r.data),
 
@@ -159,16 +160,4 @@ export const adminApi = {
       })
       .then((r) => r.data);
   },
-};
-
-export const ROLE_LABELS: Record<string, string> = {
-  STUDENT: 'Student',
-  FINANCE_OFFICER: 'Finance Officer',
-  VERIFICATION_OFFICER: 'Verification Officer',
-  SCHEDULE_OFFICER: 'Schedule Officer',
-  EXAM_MANAGER: 'Exam Manager',
-  REGISTRAR: 'Registrar',
-  DIRECTOR: 'Director',
-  ADMIN: 'Master Admin',
-  SUPER_ADMIN: 'Super Admin',
 };

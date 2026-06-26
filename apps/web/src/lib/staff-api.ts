@@ -53,25 +53,9 @@ export const staffApi = {
     return URL.createObjectURL(res.data);
   },
 
-  // Current staff member's profile + roles
+  // Current staff member's full auth payload: { user, isAdmin, permissions }
   getProfile: () =>
-    apiClient.get('/auth/profile').then((r) => r.data?.user),
-};
-
-// Extract role names from the /auth/profile user payload.
-export function rolesOf(user: any): string[] {
-  if (!user?.roles) return [];
-  return user.roles.map((r: any) => r?.role?.name).filter(Boolean);
-}
-
-export const ROLE_LABELS: Record<string, string> = {
-  FINANCE_OFFICER: 'Finance Officer',
-  VERIFICATION_OFFICER: 'Verification Officer',
-  SCHEDULE_OFFICER: 'Schedule Officer',
-  EXAM_MANAGER: 'Exam Manager',
-  REGISTRAR: 'Registrar',
-  DIRECTOR: 'Director',
-  SUPER_ADMIN: 'Super Admin',
+    apiClient.get('/auth/profile').then((r) => r.data),
 };
 
 export function formatLKR(amount: number) {

@@ -83,17 +83,13 @@ export class AdminService {
     };
   }
 
-  /* ════════════════ Users ════════════════ */
-  async listRoles() {
-    return this.prisma.role.findMany({ orderBy: { name: 'asc' } });
-  }
-
+  /* ════════════════ Users & Permissions ════════════════ */
   async listUsers() {
     const users = await this.prisma.user.findMany({
       where: { deletedAt: null, staffUser: { isNot: null } },
       include: {
         staffUser: true,
-        roles: { include: { role: true } },
+        permissions: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -106,11 +102,8 @@ export class AdminService {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('A user with this email already exists');
 
-    const roleRecords = await this.prisma.role.findMany({
-      where: { name: { in: dto.roles } },
-    });
-    if (roleRecords.length === 0) {
-      throw new BadRequestException('At least one valid role is required');
+    if (!dto.isAdmin && (!dto.permissions || dto.permissions.length === 0)) {
+      throw new BadRequestException('Grant at least one permission, or mark the user as Master Admin');
     }
 
     const password = await argon2.hash(dto.password);
@@ -119,10 +112,13 @@ export class AdminService {
       data: {
         email: dto.email,
         password,
+        isAdmin: dto.isAdmin ?? false,
         staffUser: { create: { name: dto.name, position: dto.position } },
-        roles: { create: roleRecords.map((r) => ({ roleId: r.id })) },
+        permissions: dto.isAdmin
+          ? undefined
+          : { create: (dto.permissions ?? []).map((p) => ({ resource: p.resource, level: p.level })) },
       },
-      include: { staffUser: true, roles: { include: { role: true } } },
+      include: { staffUser: true, permissions: true },
     });
 
     const { password: _pw, ...safe } = user;
@@ -156,21 +152,27 @@ export class AdminService {
       ops.push(this.prisma.user.update({ where: { id }, data: { password } }));
     }
 
-    if (dto.roles) {
-      const roleRecords = await this.prisma.role.findMany({ where: { name: { in: dto.roles } } });
-      ops.push(this.prisma.userRole.deleteMany({ where: { userId: id } }));
-      ops.push(
-        this.prisma.userRole.createMany({
-          data: roleRecords.map((r) => ({ userId: id, roleId: r.id })),
-        }),
-      );
+    if (dto.isAdmin !== undefined) {
+      ops.push(this.prisma.user.update({ where: { id }, data: { isAdmin: dto.isAdmin } }));
+    }
+
+    // Replace-all permission set when provided.
+    if (dto.permissions) {
+      ops.push(this.prisma.userPermission.deleteMany({ where: { userId: id } }));
+      if (dto.permissions.length > 0) {
+        ops.push(
+          this.prisma.userPermission.createMany({
+            data: dto.permissions.map((p) => ({ userId: id, resource: p.resource, level: p.level })),
+          }),
+        );
+      }
     }
 
     if (ops.length > 0) await this.prisma.$transaction(ops);
 
     const updated = await this.prisma.user.findUnique({
       where: { id },
-      include: { staffUser: true, roles: { include: { role: true } } },
+      include: { staffUser: true, permissions: true },
     });
     const { password: _pw, ...safe } = updated!;
     return safe;

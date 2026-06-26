@@ -12,8 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '@/auth/guards/roles.guard';
-import { Roles } from '@/auth/decorators/roles.decorator';
+import { PermissionsGuard } from '@/auth/guards/permissions.guard';
+import { RequirePermission } from '@/auth/decorators/require-permission.decorator';
 import { ApplicationsService } from './applications.service';
 import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto } from './dtos/application.dto';
 
@@ -62,16 +62,16 @@ export class ApplicationsController {
   // Staff endpoints
   // NOTE: 'stats' must be declared before ':id' so it isn't matched as an id.
   @Get('stats')
-  @UseGuards(RolesGuard)
-  @Roles('FINANCE_OFFICER', 'VERIFICATION_OFFICER', 'SCHEDULE_OFFICER', 'EXAM_MANAGER', 'REGISTRAR', 'DIRECTOR', 'SUPER_ADMIN')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('applications', 'VIEW')
   @ApiOperation({ summary: 'Get dashboard statistics (staff)' })
   getStats() {
     return this.applicationsService.getStats();
   }
 
   @Get()
-  @UseGuards(RolesGuard)
-  @Roles('FINANCE_OFFICER', 'VERIFICATION_OFFICER', 'SCHEDULE_OFFICER', 'EXAM_MANAGER', 'REGISTRAR', 'DIRECTOR', 'SUPER_ADMIN')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('applications', 'VIEW')
   @ApiOperation({ summary: 'Get all applications (staff)' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'type', required: false })
@@ -85,8 +85,8 @@ export class ApplicationsController {
   }
 
   @Get(':id')
-  @UseGuards(RolesGuard)
-  @Roles('FINANCE_OFFICER', 'VERIFICATION_OFFICER', 'SCHEDULE_OFFICER', 'EXAM_MANAGER', 'REGISTRAR', 'DIRECTOR', 'SUPER_ADMIN')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('applications', 'VIEW')
   @ApiOperation({ summary: 'Get application by ID (staff)' })
   getApplication(@Param('id') id: string) {
     return this.applicationsService.findOneStaff(id);
@@ -94,8 +94,8 @@ export class ApplicationsController {
 
   // Stage 1 — Exam Division data-validity check.
   @Patch(':id/exam-review')
-  @UseGuards(RolesGuard)
-  @Roles('VERIFICATION_OFFICER', 'EXAM_MANAGER', 'SUPER_ADMIN')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('applications', 'FULL')
   @ApiOperation({ summary: 'Exam Division: reject or forward to finance (staff)' })
   examReview(@Req() req: any, @Param('id') id: string, @Body() dto: ReviewActionDto) {
     return this.applicationsService.examReview(req.user.id, id, dto);
@@ -103,8 +103,8 @@ export class ApplicationsController {
 
   // Stage 2 — Finance payment verification.
   @Patch(':id/payment-review')
-  @UseGuards(RolesGuard)
-  @Roles('FINANCE_OFFICER', 'SUPER_ADMIN', 'ADMIN')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('payments', 'FULL')
   @ApiOperation({ summary: 'Finance: approve or reject payment (staff)' })
   paymentReview(@Req() req: any, @Param('id') id: string, @Body() dto: PaymentReviewDto) {
     return this.applicationsService.financeReview(req.user.id, id, dto);

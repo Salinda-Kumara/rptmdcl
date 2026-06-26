@@ -27,124 +27,15 @@ async function main() {
     },
   });
 
-  // Roles
-  const studentRole = await prisma.role.upsert({
-    where: { name: 'STUDENT' },
-    update: {},
-    create: { name: 'STUDENT', description: 'Student user role' },
-  });
-
-  const financeRole = await prisma.role.upsert({
-    where: { name: 'FINANCE_OFFICER' },
-    update: {},
-    create: { name: 'FINANCE_OFFICER', description: 'Finance officer role' },
-  });
-
-  const verificationRole = await prisma.role.upsert({
-    where: { name: 'VERIFICATION_OFFICER' },
-    update: {},
-    create: { name: 'VERIFICATION_OFFICER', description: 'Verification officer role' },
-  });
-
-  const examManagerRole = await prisma.role.upsert({
-    where: { name: 'EXAM_MANAGER' },
-    update: {},
-    create: { name: 'EXAM_MANAGER', description: 'Examination manager role' },
-  });
-
-  const registrarRole = await prisma.role.upsert({
-    where: { name: 'REGISTRAR' },
-    update: {},
-    create: { name: 'REGISTRAR', description: 'Registrar role' },
-  });
-
-  const directorRole = await prisma.role.upsert({
-    where: { name: 'DIRECTOR' },
-    update: {},
-    create: { name: 'DIRECTOR', description: 'Director role' },
-  });
-
-  const adminRole = await prisma.role.upsert({
-    where: { name: 'ADMIN' },
-    update: {},
-    create: { name: 'ADMIN', description: 'Master administrator role' },
-  });
-
-  // Permissions
-  const createApplicationPerm = await prisma.permission.upsert({
-    where: { name: 'application.create' },
-    update: {},
-    create: { name: 'application.create', description: 'Can create applications' },
-  });
-
-  const viewApplicationPerm = await prisma.permission.upsert({
-    where: { name: 'application.view' },
-    update: {},
-    create: { name: 'application.view', description: 'Can view applications' },
-  });
-
-  const approveApplicationPerm = await prisma.permission.upsert({
-    where: { name: 'application.approve' },
-    update: {},
-    create: { name: 'application.approve', description: 'Can approve applications' },
-  });
-
-  const verifyPaymentPerm = await prisma.permission.upsert({
-    where: { name: 'payment.verify' },
-    update: {},
-    create: { name: 'payment.verify', description: 'Can verify payments' },
-  });
-
-  const scheduleCreatePerm = await prisma.permission.upsert({
-    where: { name: 'schedule.create' },
-    update: {},
-    create: { name: 'schedule.create', description: 'Can create schedules' },
-  });
-
-  const reportViewPerm = await prisma.permission.upsert({
-    where: { name: 'report.view' },
-    update: {},
-    create: { name: 'report.view', description: 'Can view reports' },
-  });
-
-  const userManagePerm = await prisma.permission.upsert({
-    where: { name: 'user.manage' },
-    update: {},
-    create: { name: 'user.manage', description: 'Can manage users' },
-  });
-
-  // Link Permissions to Roles
-  const rolePermissions = [
-    { roleId: studentRole.id, permissionId: createApplicationPerm.id },
-    { roleId: studentRole.id, permissionId: viewApplicationPerm.id },
-    { roleId: financeRole.id, permissionId: verifyPaymentPerm.id },
-    { roleId: financeRole.id, permissionId: viewApplicationPerm.id },
-    { roleId: verificationRole.id, permissionId: approveApplicationPerm.id },
-    { roleId: verificationRole.id, permissionId: viewApplicationPerm.id },
-    { roleId: examManagerRole.id, permissionId: approveApplicationPerm.id },
-    { roleId: examManagerRole.id, permissionId: scheduleCreatePerm.id },
-    { roleId: examManagerRole.id, permissionId: viewApplicationPerm.id },
-    { roleId: registrarRole.id, permissionId: approveApplicationPerm.id },
-    { roleId: registrarRole.id, permissionId: reportViewPerm.id },
-    { roleId: directorRole.id, permissionId: approveApplicationPerm.id },
-    { roleId: directorRole.id, permissionId: reportViewPerm.id },
-    { roleId: directorRole.id, permissionId: userManagePerm.id },
-    { roleId: adminRole.id, permissionId: createApplicationPerm.id },
-    { roleId: adminRole.id, permissionId: viewApplicationPerm.id },
-    { roleId: adminRole.id, permissionId: approveApplicationPerm.id },
-    { roleId: adminRole.id, permissionId: verifyPaymentPerm.id },
-    { roleId: adminRole.id, permissionId: scheduleCreatePerm.id },
-    { roleId: adminRole.id, permissionId: reportViewPerm.id },
-    { roleId: adminRole.id, permissionId: userManagePerm.id },
-  ];
-
-  for (const rp of rolePermissions) {
-    await prisma.rolePermission.upsert({
-      where: { roleId_permissionId: { roleId: rp.roleId, permissionId: rp.permissionId } },
-      update: {},
-      create: rp,
-    });
-  }
+  // Helper: replace a staff user's permission set (PBAC).
+  const grant = async (userId: string, perms: { resource: string; level: 'VIEW' | 'FULL' }[]) => {
+    await prisma.userPermission.deleteMany({ where: { userId } });
+    if (perms.length > 0) {
+      await prisma.userPermission.createMany({
+        data: perms.map((p) => ({ userId, resource: p.resource, level: p.level })),
+      });
+    }
+  };
 
   // Subjects
   await prisma.subject.deleteMany({});
@@ -234,12 +125,6 @@ async function main() {
     create: { email: 'student@example.com', password: null },
   });
 
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: studentUser.id, roleId: studentRole.id } },
-    update: {},
-    create: { userId: studentUser.id, roleId: studentRole.id },
-  });
-
   await prisma.student.upsert({
     where: { registrationNumber: 'AA22-105-001' },
     update: {},
@@ -268,17 +153,15 @@ async function main() {
     create: { email: 'finance@example.com', password },
   });
 
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: financeUser.id, roleId: financeRole.id } },
-    update: {},
-    create: { userId: financeUser.id, roleId: financeRole.id },
-  });
-
   await prisma.staffUser.upsert({
     where: { userId: financeUser.id },
     update: {},
     create: { userId: financeUser.id, name: 'Finance Officer', position: 'Finance Officer' },
   });
+  await grant(financeUser.id, [
+    { resource: 'applications', level: 'VIEW' },
+    { resource: 'payments', level: 'FULL' },
+  ]);
 
   // Verification Officer
   const verificationUser = await prisma.user.upsert({
@@ -287,17 +170,14 @@ async function main() {
     create: { email: 'verification@example.com', password },
   });
 
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: verificationUser.id, roleId: verificationRole.id } },
-    update: {},
-    create: { userId: verificationUser.id, roleId: verificationRole.id },
-  });
-
   await prisma.staffUser.upsert({
     where: { userId: verificationUser.id },
     update: {},
     create: { userId: verificationUser.id, name: 'Verification Officer', position: 'Verification Officer' },
   });
+  await grant(verificationUser.id, [
+    { resource: 'applications', level: 'FULL' },
+  ]);
 
   // Exam Manager
   const examManagerUser = await prisma.user.upsert({
@@ -306,29 +186,22 @@ async function main() {
     create: { email: 'exammanager@example.com', password },
   });
 
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: examManagerUser.id, roleId: examManagerRole.id } },
-    update: {},
-    create: { userId: examManagerUser.id, roleId: examManagerRole.id },
-  });
-
   await prisma.staffUser.upsert({
     where: { userId: examManagerUser.id },
     update: {},
     create: { userId: examManagerUser.id, name: 'Exam Manager', position: 'Exam Manager' },
   });
+  await grant(examManagerUser.id, [
+    { resource: 'applications', level: 'FULL' },
+    { resource: 'schedules', level: 'FULL' },
+    { resource: 'reports', level: 'VIEW' },
+  ]);
 
-  // Master Admin
+  // Master Admin — full access bypass via isAdmin
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: { password },
-    create: { email: 'admin@example.com', password },
-  });
-
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: adminUser.id, roleId: adminRole.id } },
-    update: {},
-    create: { userId: adminUser.id, roleId: adminRole.id },
+    update: { password, isAdmin: true },
+    create: { email: 'admin@example.com', password, isAdmin: true },
   });
 
   await prisma.staffUser.upsert({

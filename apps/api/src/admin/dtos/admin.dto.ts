@@ -1,14 +1,32 @@
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
-/* ──────────────── Users ──────────────── */
+/* ──────────────── Users & Permissions ──────────────── */
+export enum PermissionLevel {
+  VIEW = 'VIEW',
+  FULL = 'FULL',
+}
+
+export class PermissionGrantDto {
+  @IsString()
+  @IsNotEmpty()
+  resource: string;
+
+  @IsEnum(PermissionLevel)
+  level: PermissionLevel;
+}
+
 export class CreateStaffUserDto {
   @IsEmail()
   email: string;
@@ -25,9 +43,15 @@ export class CreateStaffUserDto {
   @IsNotEmpty()
   position: string;
 
+  @IsOptional()
+  @IsBoolean()
+  isAdmin?: boolean;
+
+  @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  roles: string[]; // role names, e.g. ['FINANCE_OFFICER']
+  @ValidateNested({ each: true })
+  @Type(() => PermissionGrantDto)
+  permissions?: PermissionGrantDto[];
 }
 
 export class UpdateStaffUserDto {
@@ -45,9 +69,14 @@ export class UpdateStaffUserDto {
   password?: string;
 
   @IsOptional()
+  @IsBoolean()
+  isAdmin?: boolean;
+
+  @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  roles?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => PermissionGrantDto)
+  permissions?: PermissionGrantDto[];
 }
 
 /* ──────────────── Programmes ──────────────── */
