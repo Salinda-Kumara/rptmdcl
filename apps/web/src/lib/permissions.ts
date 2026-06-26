@@ -41,7 +41,11 @@ export interface MyAuth {
   loading: boolean;
 }
 
-/** Fetch the current user's effective permissions from /auth/profile. */
+/** Fetch the current user's effective permissions from /auth/profile.
+ *
+ * The API returns:
+ *   { isAdmin: bool, permissions: { resource: level }, user: { staffUser, email, ... } }
+ */
 export function useMyPermissions(): MyAuth {
   const [state, setState] = useState<MyAuth>({ isAdmin: false, permissions: {}, loading: true });
 
@@ -52,6 +56,7 @@ export function useMyPermissions(): MyAuth {
         const d = r.data;
         setState({
           isAdmin: !!d?.isAdmin,
+          // permissions is already a resource→level map from effectivePermissions()
           permissions: (d?.permissions ?? {}) as PermissionMap,
           name: d?.user?.staffUser?.name || d?.user?.email,
           email: d?.user?.email,

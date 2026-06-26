@@ -131,6 +131,8 @@ export const adminApi = {
   listBatches: () => apiClient.get<AdminBatch[]>('/admin/batches').then((r) => r.data),
   createBatch: (data: { batchNumber: string; intake: string; programmeId: string }) =>
     apiClient.post<AdminBatch>('/admin/batches', data).then((r) => r.data),
+  updateBatch: (batchNumber: string, intake: string, data: { programmeId: string }) =>
+    apiClient.patch<AdminBatch>(`/admin/batches/${encodeURIComponent(batchNumber)}/${encodeURIComponent(intake)}`, data).then((r) => r.data),
   deleteBatch: (batchNumber: string, intake: string) =>
     apiClient.delete(`/admin/batches/${encodeURIComponent(batchNumber)}/${encodeURIComponent(intake)}`).then((r) => r.data),
 
@@ -143,7 +145,7 @@ export const adminApi = {
   deleteSchedule: (id: string) => apiClient.delete(`/admin/exam-schedules/${id}`).then((r) => r.data),
 
   // Students
-  listStudents: (params: { search?: string; take?: number; skip?: number }) =>
+  listStudents: (params: { search?: string; take?: number; skip?: number; batchNumber?: string; intake?: string }) =>
     apiClient.get<{ items: AdminStudent[]; total: number }>('/admin/students', { params }).then((r) => r.data),
   createStudent: (data: Partial<AdminStudent> & { registrationNumber: string; nic: string; fullName: string }) =>
     apiClient.post<AdminStudent>('/admin/students', data).then((r) => r.data),

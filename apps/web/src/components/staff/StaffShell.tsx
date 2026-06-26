@@ -1,58 +1,69 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import React, { useState } from 'react';
 import {
-  LayoutDashboard,
-  FileText,
-  Wallet,
-  CalendarDays,
-  BarChart3,
-  LogOut,
-  ShieldCheck,
-  Menu,
-  X,
-  Crown,
+  LayoutDashboard, FileText, Wallet, CalendarDays,
+  BarChart3, LogOut, ShieldCheck, Menu, X, Crown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
 import { useMyPermissions, can } from '@/lib/permissions';
+import { DashboardPanel } from './panels/DashboardPanel';
+import { ApplicationsPanel } from './panels/ApplicationsPanel';
+import { ApplicationDetailPanel } from './panels/ApplicationDetailPanel';
+import { ThemeToggle } from '@/components/ThemeToggle';
+
+type View = 'dashboard' | 'applications' | 'app-detail' | 'payments' | 'schedules' | 'reports' | 'admin';
 
 interface NavItem {
-  href: string;
+  view: View;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  exact?: boolean;
-  resource?: string; // visible when the user can VIEW this resource
+  resource?: string;
   adminOnly?: boolean;
 }
 
 const NAV: NavItem[] = [
-  { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/staff/applications', label: 'Applications', icon: FileText, resource: 'applications' },
-  { href: '/dashboard/staff/payments', label: 'Payments', icon: Wallet, resource: 'payments' },
-  { href: '/dashboard/staff/schedules', label: 'Schedules', icon: CalendarDays, resource: 'schedules' },
-  { href: '/dashboard/staff/reports', label: 'Reports', icon: BarChart3, resource: 'reports' },
-  { href: '/dashboard/admin', label: 'Admin Console', icon: Crown, adminOnly: true },
+  { view: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
+  { view: 'applications', label: 'Applications',  icon: FileText,      resource: 'applications' },
+  { view: 'payments',     label: 'Payments',      icon: Wallet,        resource: 'payments' },
+  { view: 'schedules',    label: 'Schedules',     icon: CalendarDays,  resource: 'schedules' },
+  { view: 'reports',      label: 'Reports',       icon: BarChart3,     resource: 'reports' },
+  { view: 'admin',        label: 'Admin Console', icon: Crown,         adminOnly: true },
 ];
 
-export function StaffShell({ children }: { children: React.ReactNode }) {
+function ComingSoon({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white py-24 text-center">
+      <p className="text-lg font-semibold text-slate-400">{label}</p>
+      <p className="mt-1 text-sm text-slate-300">Coming soon</p>
+    </div>
+  );
+}
+
+export function StaffShell() {
   const { user, logout } = useAuth();
-  const pathname = usePathname();
   const { isAdmin, permissions, name } = useMyPermissions();
+  const [view, setView] = useState<View>('dashboard');
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navigate = (v: string, id?: string) => {
+    setView(v as View);
+    if (id) setSelectedAppId(id);
+    setMobileOpen(false);
+    window.scrollTo({ top: 0 });
+  };
 
   const visibleNav = NAV.filter((n) => {
     if (n.adminOnly) return isAdmin;
     if (!n.resource) return true;
     return isAdmin || can(permissions, n.resource, 'VIEW');
   });
-  const isActive = (item: NavItem) => (item.exact ? pathname === item.href : pathname.startsWith(item.href));
 
   const displayName = name || user?.name || user?.email || 'Staff';
-  const initials = displayName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-  const roleLabel = isAdmin ? 'Master Admin' : 'Staff';
+  const initials = displayName.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+  const activeView = view === 'app-detail' ? 'applications' : view;
 
   const SidebarContent = () => (
     <>
@@ -68,14 +79,13 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {visibleNav.map((item) => {
-          const active = isActive(item);
+          const active = activeView === item.view;
           const Icon = item.icon;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+            <button
+              key={item.view}
+              onClick={() => navigate(item.view)}
+              className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all text-left ${
                 active
                   ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-md'
                   : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
@@ -83,7 +93,7 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
             >
               <Icon className={`h-[18px] w-[18px] ${active ? 'text-white' : 'text-indigo-300 group-hover:text-white'}`} />
               {item.label}
-            </Link>
+            </button>
           );
         })}
       </nav>
@@ -95,9 +105,10 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-white">{displayName}</p>
-            <p className="truncate text-[11px] text-indigo-300">{roleLabel || 'Staff'}</p>
+            <p className="truncate text-[11px] text-indigo-300">{isAdmin ? 'Master Admin' : 'Staff'}</p>
           </div>
         </div>
+        <ThemeToggle />
         <button
           onClick={logout}
           className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-indigo-200 transition-colors hover:bg-red-500/10 hover:text-red-300"
@@ -111,7 +122,7 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ProtectedLayout>
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
         <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-indigo-950 lg:flex">
           <SidebarContent />
         </aside>
@@ -129,14 +140,22 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
         )}
 
         <div className="lg:pl-64">
-          <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-white px-4 lg:hidden">
-            <button onClick={() => setMobileOpen(true)} className="text-slate-600">
+          <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 lg:hidden">
+            <button onClick={() => setMobileOpen(true)} className="text-slate-600 dark:text-gray-400">
               <Menu className="h-6 w-6" />
             </button>
-            <span className="text-sm font-semibold text-slate-900">ERMAS Staff</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">ERMAS Staff</span>
           </div>
 
-          <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+          <main className="w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            {view === 'dashboard'    && <DashboardPanel onNavigate={navigate} />}
+            {view === 'applications' && <ApplicationsPanel onNavigate={navigate} />}
+            {view === 'app-detail'   && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} />}
+            {view === 'payments'     && <ComingSoon label="Payments" />}
+            {view === 'schedules'    && <ComingSoon label="Schedules" />}
+            {view === 'reports'      && <ComingSoon label="Reports" />}
+            {view === 'admin'        && <ComingSoon label="Admin Console" />}
+          </main>
         </div>
       </div>
     </ProtectedLayout>

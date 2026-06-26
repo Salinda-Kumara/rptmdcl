@@ -25,6 +25,7 @@ import {
   CreateSubjectDto,
   UpdateSubjectDto,
   CreateBatchDto,
+  UpdateBatchDto,
   CreateExamScheduleDto,
   UpdateExamScheduleDto,
   CreateStudentDto,
@@ -138,6 +139,16 @@ export class AdminController {
     return this.adminService.createBatch(dto);
   }
 
+  @Patch('batches/:batchNumber/:intake')
+  @RequirePermission('batches', 'FULL')
+  updateBatch(
+    @Param('batchNumber') batchNumber: string,
+    @Param('intake') intake: string,
+    @Body() dto: UpdateBatchDto,
+  ) {
+    return this.adminService.updateBatch(batchNumber, intake, dto);
+  }
+
   @Delete('batches/:batchNumber/:intake')
   @RequirePermission('batches', 'FULL')
   deleteBatch(@Param('batchNumber') batchNumber: string, @Param('intake') intake: string) {
@@ -177,8 +188,10 @@ export class AdminController {
     @Query('search') search?: string,
     @Query('take') take?: string,
     @Query('skip') skip?: string,
+    @Query('batchNumber') batchNumber?: string,
+    @Query('intake') intake?: string,
   ) {
-    return this.adminService.listStudents(search, take ? +take : 50, skip ? +skip : 0);
+    return this.adminService.listStudents(search, take ? +take : 50, skip ? +skip : 0, batchNumber, intake);
   }
 
   @Post('students')

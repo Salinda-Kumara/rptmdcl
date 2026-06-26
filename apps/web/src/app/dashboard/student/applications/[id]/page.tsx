@@ -125,12 +125,20 @@ export default function ApplicationDetailPage() {
                   <FileText className="h-6 w-6" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-slate-900">
-                    {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} Application
-                  </h1>
+                  <div className="flex items-center gap-2.5">
+                    <h1 className="text-xl font-bold text-slate-900">
+                      {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} Application
+                    </h1>
+                    {app.serialNumber && (
+                      <span className="rounded-lg bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 font-mono text-sm font-bold text-indigo-700">
+                        #{app.serialNumber}
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-0.5 text-sm text-slate-400">
-                    Created{' '}
-                    {new Date(app.createdAt).toLocaleDateString('en-LK', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    {app.serialNumber
+                      ? `Submitted on ${new Date(app.submittedAt ?? app.createdAt).toLocaleDateString('en-LK', { year: 'numeric', month: 'long', day: 'numeric' })}`
+                      : `Created ${new Date(app.createdAt).toLocaleDateString('en-LK', { year: 'numeric', month: 'long', day: 'numeric' })}`}
                   </p>
                 </div>
               </div>

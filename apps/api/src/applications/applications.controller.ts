@@ -74,14 +74,21 @@ export class ApplicationsController {
   @RequirePermission('applications', 'VIEW')
   @ApiOperation({ summary: 'Get all applications (staff)' })
   @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'statuses', required: false })
   @ApiQuery({ name: 'type', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'dateFrom', required: false, description: 'ISO date string YYYY-MM-DD' })
+  @ApiQuery({ name: 'dateTo', required: false, description: 'ISO date string YYYY-MM-DD' })
   getAllApplications(
     @Query('status') status?: string,
+    @Query('statuses') statusesRaw?: string,
     @Query('type') type?: string,
     @Query('search') search?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
   ) {
-    return this.applicationsService.findAllStaff({ status, type, search });
+    const statuses = statusesRaw ? statusesRaw.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+    return this.applicationsService.findAllStaff({ status, statuses, type, search, dateFrom, dateTo });
   }
 
   @Get(':id')

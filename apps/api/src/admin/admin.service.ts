@@ -14,6 +14,7 @@ import {
   CreateSubjectDto,
   UpdateSubjectDto,
   CreateBatchDto,
+  UpdateBatchDto,
   CreateExamScheduleDto,
   UpdateExamScheduleDto,
   CreateStudentDto,
@@ -269,6 +270,19 @@ export class AdminService {
     return this.prisma.batch.create({ data: dto });
   }
 
+  async updateBatch(batchNumber: string, intake: string, dto: UpdateBatchDto) {
+    const b = await this.prisma.batch.findUnique({
+      where: { batchNumber_intake: { batchNumber, intake } },
+    });
+    if (!b) throw new NotFoundException('Batch not found');
+    await this.ensureProgramme(dto.programmeId);
+    return this.prisma.batch.update({
+      where: { batchNumber_intake: { batchNumber, intake } },
+      data: { programmeId: dto.programmeId },
+      include: { programme: { select: { code: true, name: true } }, _count: { select: { students: true } } },
+    });
+  }
+
   async deleteBatch(batchNumber: string, intake: string) {
     const b = await this.prisma.batch.findUnique({
       where: { batchNumber_intake: { batchNumber, intake } },
@@ -328,8 +342,10 @@ export class AdminService {
   }
 
   /* ════════════════ Students (list) ════════════════ */
-  async listStudents(search?: string, take = 50, skip = 0) {
+  async listStudents(search?: string, take = 50, skip = 0, batchNumber?: string, intake?: string) {
     const where: any = { deletedAt: null };
+    if (batchNumber) where.batchNumber = batchNumber;
+    if (intake) where.intake = intake;
     if (search) {
       where.OR = [
         { fullName: { contains: search, mode: 'insensitive' } },

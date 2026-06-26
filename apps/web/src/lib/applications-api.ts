@@ -40,6 +40,7 @@ export interface Application {
   type: 'MEDICAL' | 'REPEAT';
   status: string;
   totalFee: number;
+  serialNumber?: string;
   paymentReferenceId?: string;
   submittedAt?: string;
   createdAt: string;

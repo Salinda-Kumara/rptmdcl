@@ -5,6 +5,7 @@
     "lib": ["ES2021"],
     "declaration": true,
     "outDir": "./dist",
+    "ignoreDeprecations": "5.0",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,

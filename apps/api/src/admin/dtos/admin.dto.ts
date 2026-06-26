@@ -152,6 +152,12 @@ export class CreateBatchDto {
   programmeId: string;
 }
 
+export class UpdateBatchDto {
+  @IsString()
+  @IsNotEmpty()
+  programmeId: string;
+}
+
 /* ──────────────── Students ──────────────── */
 export class CreateStudentDto {
   @IsString()

@@ -38,7 +38,6 @@ async function main() {
   };
 
   // Subjects
-  await prisma.subject.deleteMany({});
 
   const subjectData = [
     { code: 'BSAA11013', name: 'Financial Accounting', category: 'Core', programmeId: accountingProgramme.id },

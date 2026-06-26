@@ -121,6 +121,28 @@ export class ApplicationsService {
     return application;
   }
 
+  /** Generate a daily serial number: YYYYMMDD-NN (resets at midnight each day). */
+  private async generateSerialNumber(): Promise<string> {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${y}${m}${d}`;
+
+    const startOfDay = new Date(y, now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfDay   = new Date(y, now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    const count = await this.prisma.application.count({
+      where: {
+        serialNumber: { startsWith: dateStr },
+        deletedAt: null,
+      },
+    });
+
+    const seq = String(count + 1).padStart(2, '0');
+    return `${dateStr}-${seq}`;
+  }
+
   async submit(userId: string, id: string, dto: SubmitApplicationDto) {
     const student = await this.prisma.student.findFirst({ where: { userId } });
     if (!student) throw new NotFoundException('Student not found');
@@ -150,10 +172,13 @@ export class ApplicationsService {
       }
     }
 
+    const serialNumber = await this.generateSerialNumber();
+
     const updated = await this.prisma.application.update({
       where: { id },
       data: {
         status: 'SUBMITTED',
+        serialNumber,
         paymentReferenceId: dto.paymentReferenceId,
         submittedAt: new Date(),
         payment: {
@@ -319,10 +344,34 @@ export class ApplicationsService {
 
   // Staff: get all applications (with optional filters).
   // DRAFT applications are private to the student and excluded from staff views.
-  async findAllStaff(filters: { status?: string; type?: string; search?: string }) {
+  async findAllStaff(filters: {
+    status?: string; statuses?: string[]; type?: string; search?: string;
+    dateFrom?: string; dateTo?: string;
+  }) {
     const where: any = { deletedAt: null };
-    where.status = filters.status ? filters.status : { not: 'DRAFT' };
+    if (filters.statuses && filters.statuses.length > 0) {
+      where.status = { in: filters.statuses };
+    } else if (filters.status) {
+      where.status = filters.status;
+    } else {
+      where.status = { not: 'DRAFT' };
+    }
     if (filters.type) where.type = filters.type;
+
+    // Date range on submittedAt
+    if (filters.dateFrom || filters.dateTo) {
+      where.submittedAt = {};
+      if (filters.dateFrom) {
+        const from = new Date(filters.dateFrom);
+        from.setHours(0, 0, 0, 0);
+        where.submittedAt.gte = from;
+      }
+      if (filters.dateTo) {
+        const to = new Date(filters.dateTo);
+        to.setHours(23, 59, 59, 999);
+        where.submittedAt.lte = to;
+      }
+    }
 
     if (filters.search) {
       where.student = {

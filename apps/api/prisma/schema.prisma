@@ -163,6 +163,7 @@ model Application {
   // Snapshot of the applicant's personal details as entered on THIS application
   // form. Corrections here do not modify the Student master record.
   applicantDetails  Json?
+  serialNumber      String?   @unique // e.g. 20260627-01 — assigned on submission
   submittedAt       DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

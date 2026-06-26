@@ -145,6 +145,11 @@ export default function ApplicationsListPage() {
                   <p className="text-sm font-semibold text-slate-900">
                     {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} Application
                   </p>
+                  {app.serialNumber && (
+                    <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-[10px] font-bold text-indigo-600">
+                      #{app.serialNumber}
+                    </span>
+                  )}
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[app.status] || 'bg-slate-100 text-slate-600'}`}
                   >

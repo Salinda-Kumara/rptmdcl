@@ -6,10 +6,9 @@ import { useRouter, usePathname } from 'next/navigation';
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
-  requiredRole?: string;
 }
 
-export function ProtectedLayout({ children, requiredRole }: ProtectedLayoutProps) {
+export function ProtectedLayout({ children }: ProtectedLayoutProps) {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
