@@ -86,13 +86,14 @@ export class AdminService {
 
   /* ════════════════ Users & Permissions ════════════════ */
   async listUsers() {
+    // Include deactivated staff (deletedAt set) so admins can reactivate them.
     const users = await this.prisma.user.findMany({
-      where: { deletedAt: null, staffUser: { isNot: null } },
+      where: { staffUser: { isNot: null } },
       include: {
         staffUser: true,
         permissions: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ deletedAt: 'asc' }, { createdAt: 'desc' }], // active first
     });
 
     // Never leak password hashes.
@@ -183,6 +184,15 @@ export class AdminService {
     const user = await this.prisma.user.findFirst({ where: { id, deletedAt: null } });
     if (!user) throw new NotFoundException('User not found');
     await this.prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { success: true };
+  }
+
+  async reactivateUser(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, deletedAt: { not: null }, staffUser: { isNot: null } },
+    });
+    if (!user) throw new NotFoundException('Deactivated user not found');
+    await this.prisma.user.update({ where: { id }, data: { deletedAt: null } });
     return { success: true };
   }
 

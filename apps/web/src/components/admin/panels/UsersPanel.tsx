@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Users, Plus, Pencil, Trash2, ShieldCheck, Crown, Loader2, AlertCircle } from 'lucide-react';
+import { Users, Plus, Pencil, Ban, RotateCcw, ShieldCheck, Crown, Loader2, AlertCircle } from 'lucide-react';
 import { Modal, Field } from '@/components/admin/Modal';
 import { adminApi, AdminUser } from '@/lib/admin-api';
 import { RESOURCES, AccessLevel } from '@/lib/permissions';
@@ -57,8 +57,13 @@ export function UsersPanel() {
   };
 
   const deactivate = async (u: AdminUser) => {
-    if (!confirm(`Deactivate ${u.staffUser?.name || u.email}?`)) return;
+    if (!confirm(`Deactivate ${u.staffUser?.name || u.email}? They will no longer be able to log in.`)) return;
     await adminApi.deactivateUser(u.id); load();
+  };
+
+  const activate = async (u: AdminUser) => {
+    if (!confirm(`Reactivate ${u.staffUser?.name || u.email}? They will be able to log in again.`)) return;
+    await adminApi.activateUser(u.id); load();
   };
 
   const resourceLabel = (key: string) => RESOURCES.find((r) => r.key === key)?.label || key;
@@ -84,14 +89,17 @@ export function UsersPanel() {
               <th className="px-6 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Email</th>
               <th className="px-4 py-3 font-medium">Access</th>
+              <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium text-right">Actions</th>
             </tr></thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                  <td className="px-6 py-3.5"><p className="font-semibold text-slate-900">{u.staffUser?.name || '—'}</p><p className="text-xs text-slate-400">{u.staffUser?.position}</p></td>
-                  <td className="px-4 py-3.5 text-slate-600">{u.email}</td>
-                  <td className="px-4 py-3.5">
+              {users.map((u) => {
+                const inactive = !!u.deletedAt;
+                return (
+                <tr key={u.id} className={`border-b border-slate-50 last:border-0 hover:bg-slate-50/50 ${inactive ? 'bg-slate-50/40' : ''}`}>
+                  <td className={`px-6 py-3.5 ${inactive ? 'opacity-60' : ''}`}><p className="font-semibold text-slate-900">{u.staffUser?.name || '—'}</p><p className="text-xs text-slate-400">{u.staffUser?.position}</p></td>
+                  <td className={`px-4 py-3.5 text-slate-600 ${inactive ? 'opacity-60' : ''}`}>{u.email}</td>
+                  <td className={`px-4 py-3.5 ${inactive ? 'opacity-60' : ''}`}>
                     {u.isAdmin ? <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700"><Crown className="h-3 w-3" /> Master Admin</span>
                     : u.permissions.length === 0 ? <span className="text-xs text-slate-400">No access</span>
                     : <div className="flex flex-wrap gap-1">{u.permissions.map((p) => (
@@ -100,12 +108,20 @@ export function UsersPanel() {
                         </span>
                       ))}</div>}
                   </td>
+                  <td className="px-4 py-3.5">
+                    {inactive
+                      ? <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600">Inactive</span>
+                      : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Active</span>}
+                  </td>
                   <td className="px-4 py-3.5"><div className="flex justify-end gap-1">
-                    <button onClick={() => openEdit(u)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-amber-600"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => deactivate(u)} className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => openEdit(u)} title="Edit" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-amber-600"><Pencil className="h-4 w-4" /></button>
+                    {inactive
+                      ? <button onClick={() => activate(u)} title="Reactivate" className="rounded-lg p-2 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600"><RotateCcw className="h-4 w-4" /></button>
+                      : <button onClick={() => deactivate(u)} title="Deactivate" className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600"><Ban className="h-4 w-4" /></button>}
                   </div></td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -34,7 +34,16 @@ export class StudentsService {
       throw new NotFoundException('Student not found');
     }
 
-    return student.batch?.programme?.subjects ?? [];
+    const own = student.batch?.programme?.subjects ?? [];
+    if (own.length > 0) return own;
+
+    // Fallback: the student's programme has no subjects of its own (e.g. imported
+    // students whose batch maps to a programme that hasn't been set up with
+    // subjects yet). Return all active subjects so they can still apply.
+    return this.prisma.subject.findMany({
+      where: { deletedAt: null },
+      orderBy: [{ programmeId: 'asc' }, { code: 'asc' }],
+    });
   }
 
   async getExamSchedules(userId: string) {

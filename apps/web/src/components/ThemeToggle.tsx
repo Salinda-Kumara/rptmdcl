@@ -18,7 +18,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
       <button
         onClick={() => setTheme(isDark ? 'light' : 'dark')}
         title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-        className="flex items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+        className="flex items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors"
       >
         {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </button>

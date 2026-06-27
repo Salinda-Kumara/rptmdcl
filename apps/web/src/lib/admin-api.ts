@@ -26,6 +26,7 @@ export interface AdminUser {
   email: string;
   isAdmin: boolean;
   createdAt: string;
+  deletedAt?: string | null;
   staffUser?: { name: string; position: string } | null;
   permissions: { resource: string; level: AccessLevel }[];
 }
@@ -109,6 +110,7 @@ export const adminApi = {
   updateUser: (id: string, data: { name?: string; position?: string; password?: string; isAdmin?: boolean; permissions?: PermissionGrant[] }) =>
     apiClient.patch<AdminUser>(`/admin/users/${id}`, data).then((r) => r.data),
   deactivateUser: (id: string) => apiClient.delete(`/admin/users/${id}`).then((r) => r.data),
+  activateUser: (id: string) => apiClient.patch(`/admin/users/${id}/activate`).then((r) => r.data),
 
   // Programmes
   listProgrammes: () => apiClient.get<AdminProgramme[]>('/admin/programmes').then((r) => r.data),

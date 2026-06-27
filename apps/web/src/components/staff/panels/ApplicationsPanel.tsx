@@ -7,8 +7,16 @@ import {
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { formatFee } from '@/lib/applications-api';
+import { useMyPermissions } from '@/lib/permissions';
 
 interface Props { onNavigate: (view: string, id?: string) => void; }
+
+type FinanceTab = 'pending' | 'approved' | 'rejected';
+const FINANCE_TABS: { key: FinanceTab; label: string; status: string; icon: React.ComponentType<{ className?: string }>; tint: string }[] = [
+  { key: 'pending',  label: 'To Verify',        status: 'PAYMENT_PENDING',  icon: Wallet,       tint: 'text-amber-700' },
+  { key: 'approved', label: 'Approved',          status: 'PAYMENT_VERIFIED', icon: CheckCircle2, tint: 'text-emerald-700' },
+  { key: 'rejected', label: 'Rejected',          status: 'PAYMENT_REJECTED', icon: XCircle,      tint: 'text-red-700' },
+];
 
 type ColKey = 'ex-new' | 'ex-verified' | 'ex-rejected' | 'fi-pending' | 'fi-verified' | 'fi-rejected' | 'approved';
 
@@ -56,6 +64,13 @@ const DONE_BEFORE: Record<ColKey, ColKey[]> = {
 type Tab = 'new' | 'all';
 
 export function ApplicationsPanel({ onNavigate }: Props) {
+  const { isAdmin, permissions } = useMyPermissions();
+  // Finance officers (payments access, not full application reviewers) get a
+  // focused view: only applications the Exam Division forwarded for payment
+  // verification, split into To Verify / Approved / Rejected.
+  const isFinanceOnly = !isAdmin && permissions.applications !== 'FULL' && !!permissions.payments;
+  const [financeTab, setFinanceTab] = useState<FinanceTab>('pending');
+
   const [tab, setTab] = useState<Tab>('new');
   const [all, setAll] = useState<StaffApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,6 +144,132 @@ export function ApplicationsPanel({ onNavigate }: Props) {
         return serialSort === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
       })
     : newAppsRaw;
+
+  /* ──────────────── Finance-only focused view ──────────────── */
+  if (isFinanceOnly) {
+    const rows = filtered.filter((a) => a.status === FINANCE_TABS.find((t) => t.key === financeTab)!.status);
+    return (
+      <div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-gray-100">Payment Verification</h1>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">Applications forwarded by the Exam Division for payment verification.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, reg. no…"
+                className="w-44 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs shadow-sm focus:border-indigo-400 focus:outline-none" />
+            </div>
+            <button onClick={load} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50">
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-indigo-500' : ''}`} /> Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Finance tabs */}
+        <div className="mb-4 flex gap-1 rounded-xl border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 p-1 w-fit">
+          {FINANCE_TABS.map((t) => {
+            const Icon = t.icon;
+            const count = filtered.filter((a) => a.status === t.status).length;
+            const active = financeTab === t.key;
+            return (
+              <button key={t.key} onClick={() => setFinanceTab(t.key)}
+                className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                  active ? `bg-white dark:bg-gray-700 ${t.tint} shadow-sm` : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
+                }`}>
+                <Icon className="h-4 w-4" />
+                {t.label}
+                {!loading && <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${active ? 'bg-slate-100 dark:bg-gray-600' : 'bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400'}`}>{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Date filter — same as the Admin "Applications" view */}
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+          <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 shrink-0">Filter by date:</span>
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-medium text-slate-400 dark:text-gray-600">From</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2.5 py-1.5 text-xs text-slate-700 dark:text-gray-300 shadow-sm focus:border-indigo-400 focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-medium text-slate-400 dark:text-gray-600">To</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              min={dateFrom || undefined}
+              className="rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2.5 py-1.5 text-xs text-slate-700 dark:text-gray-300 shadow-sm focus:border-indigo-400 focus:outline-none"
+            />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="ml-1 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 px-2.5 py-1.5 text-[10px] font-semibold text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              Clear
+            </button>
+          )}
+          {(dateFrom || dateTo) && !loading && (
+            <span className="ml-auto text-[10px] text-slate-400 dark:text-gray-600">
+              {rows.length} result{rows.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex animate-pulse items-center gap-4 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="h-8 w-8 rounded-lg bg-slate-100" /><div className="flex-1 space-y-2"><div className="h-3 w-1/3 rounded bg-slate-100" /><div className="h-2.5 w-1/2 rounded bg-slate-100" /></div>
+            </div>))}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-gray-700 bg-white dark:bg-gray-900 py-20 text-center">
+            <Inbox className="h-10 w-10 text-slate-300 dark:text-gray-600" />
+            <p className="mt-3 text-sm font-medium text-slate-500 dark:text-gray-400">
+              {financeTab === 'pending' ? 'No applications awaiting payment verification' : financeTab === 'approved' ? 'No approved payments yet' : 'No rejected payments'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/60 text-left">
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Serial No.</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Registration No.</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Student</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Type</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 text-right">Fee</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Payment Ref</th>
+                  <th className="w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((app, i) => (
+                  <tr key={app.id} onClick={() => onNavigate('app-detail', app.id)}
+                    className={`cursor-pointer border-t border-slate-100 dark:border-gray-800 transition-colors ${i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-slate-50/50 dark:bg-gray-900/60'} hover:bg-amber-50/50 dark:hover:bg-amber-900/10`}>
+                    <td className="px-4 py-3"><span className="rounded bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">{app.serialNumber || '—'}</span></td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700 dark:text-gray-300">{app.student?.registrationNumber || '—'}</td>
+                    <td className="px-4 py-3"><p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{app.student?.fullName || '—'}</p><p className="text-[10px] text-slate-400 dark:text-gray-600">{app.student?.batchNumber}</p></td>
+                    <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{app.type === 'MEDICAL' ? 'Medical' : 'Repeat'}</span></td>
+                    <td className="px-4 py-3 text-right text-xs font-bold text-slate-800 dark:text-gray-200">{formatFee(app.totalFee)}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-gray-400">{app.paymentReferenceId || '—'}</td>
+                    <td className="px-4 py-3 text-slate-300"><ChevronRight className="h-4 w-4" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>

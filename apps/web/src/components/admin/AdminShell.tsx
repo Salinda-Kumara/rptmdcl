@@ -194,22 +194,28 @@ export function AdminShell() {
         </div>}
       </nav>
 
-      {/* User footer */}
-      <div className="border-t border-slate-700/50 p-3">
-        <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-600 text-xs font-semibold text-white">{initials}</div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">{displayName}</p>
-            <p className="truncate text-[11px] text-amber-300/80">{isAdmin ? 'Master Admin' : 'Staff'}</p>
-          </div>
-        </div>
-        <ThemeToggle />
-        <button onClick={logout}
-          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-red-500/10 hover:text-red-300">
-          <LogOut className="h-[18px] w-[18px]" /> Sign out
-        </button>
-      </div>
     </>
+  );
+
+  // Profile cluster shown at the top-right of the header (desktop + mobile).
+  const ProfileCluster = () => (
+    <div className="flex items-center gap-2 sm:gap-3">
+      <ThemeToggle compact />
+      <div className="hidden text-right sm:block">
+        <p className="text-sm font-medium leading-tight text-slate-900 dark:text-gray-100">{displayName}</p>
+        <p className="text-[11px] leading-tight text-amber-600 dark:text-amber-400">{isAdmin ? 'Master Admin' : 'Staff'}</p>
+      </div>
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-600 text-xs font-semibold text-white">
+        {initials}
+      </div>
+      <button
+        onClick={logout}
+        title="Sign out"
+        className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+      >
+        <LogOut className="h-[18px] w-[18px]" />
+      </button>
+    </div>
   );
 
   return (
@@ -232,11 +238,19 @@ export function AdminShell() {
         )}
 
         <div className="lg:pl-64">
-          {/* Mobile topbar */}
-          <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 lg:hidden">
-            <button onClick={() => setMobileOpen(true)} className="text-slate-600 dark:text-gray-400"><Menu className="h-6 w-6" /></button>
-            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">ERMAS Admin</span>
-          </div>
+          {/* Top header — profile cluster shows only on the Dashboard view.
+              On other views the desktop bar is hidden; the mobile nav bar stays. */}
+          <header className={`sticky top-0 z-30 h-14 items-center gap-3 border-b border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 sm:px-6 ${view === 'dashboard' ? 'flex' : 'flex lg:hidden'}`}>
+            <button onClick={() => setMobileOpen(true)} className="text-slate-600 dark:text-gray-400 lg:hidden">
+              <Menu className="h-6 w-6" />
+            </button>
+            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100 lg:hidden">ERMAS Admin</span>
+            {view === 'dashboard' && (
+              <div className="ml-auto">
+                <ProfileCluster />
+              </div>
+            )}
+          </header>
 
           <main className="w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             {view === 'dashboard'      && <AdminDashboardPanel onNavigate={navigate} />}

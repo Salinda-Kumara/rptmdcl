@@ -76,6 +76,13 @@ export class AdminController {
     return this.adminService.deactivateUser(id);
   }
 
+  @Patch('users/:id/activate')
+  @RequirePermission('users', 'FULL')
+  @ApiOperation({ summary: 'Reactivate a deactivated staff user (admin)' })
+  activateUser(@Param('id') id: string) {
+    return this.adminService.reactivateUser(id);
+  }
+
   /* ── Programmes ── */
   @Get('programmes')
   @RequirePermission('programmes', 'VIEW')
