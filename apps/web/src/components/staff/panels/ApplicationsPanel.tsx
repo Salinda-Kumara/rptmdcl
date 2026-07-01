@@ -4,10 +4,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Inbox, RefreshCw, Search, ClipboardList, ShieldAlert, XCircle,
   Wallet, CheckCircle2, BadgeCheck, FileClock, ChevronRight,
+  FileSpreadsheet, FileText, Loader2,
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { formatFee } from '@/lib/applications-api';
 import { useMyPermissions } from '@/lib/permissions';
+import { exportApplicationsExcel, exportApplicationsPdf } from '@/lib/export-applications';
 
 interface Props { onNavigate: (view: string, id?: string) => void; }
 
@@ -81,6 +83,8 @@ export function ApplicationsPanel({ onNavigate }: Props) {
   const [serialSort, setSerialSort] = useState<'asc' | 'desc' | null>(null);
   const [allSortCol, setAllSortCol] = useState<ColKey | null>(null);
   const [allSortDir, setAllSortDir] = useState<'asc' | 'desc'>('asc');
+  const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
+  const [exportingApproved, setExportingApproved] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -125,6 +129,33 @@ export function ApplicationsPanel({ onNavigate }: Props) {
     } else {
       setAllSortCol(col);
       setAllSortDir('asc');
+    }
+  };
+
+  const handleExport = async (kind: 'excel' | 'pdf') => {
+    if (exporting) return;
+    setExporting(kind);
+    try {
+      if (kind === 'excel') await exportApplicationsExcel(allSorted);
+      else await exportApplicationsPdf(allSorted);
+    } catch (e) {
+      console.error('Export failed', e);
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  // Approved-only Excel export (PAYMENT_VERIFIED + APPROVED map to the Approved column).
+  const approvedApps = filtered.filter((a) => getActiveCol(a.status) === 'approved');
+  const handleExportApproved = async () => {
+    if (exportingApproved || approvedApps.length === 0) return;
+    setExportingApproved(true);
+    try {
+      await exportApplicationsExcel(approvedApps);
+    } catch (e) {
+      console.error('Export failed', e);
+    } finally {
+      setExportingApproved(false);
     }
   };
 
@@ -368,11 +399,29 @@ export function ApplicationsPanel({ onNavigate }: Props) {
               Clear
             </button>
           )}
-          {(dateFrom || dateTo) && !loading && (
-            <span className="ml-auto text-[10px] text-slate-400 dark:text-gray-600">
-              {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+
+          {/* Export buttons */}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-[10px] text-slate-400 dark:text-gray-600">
+              {loading ? '…' : `${allSorted.length} record${allSorted.length !== 1 ? 's' : ''}`}
             </span>
-          )}
+            <button
+              onClick={() => handleExport('excel')}
+              disabled={loading || allSorted.length === 0 || exporting !== null}
+              className="flex items-center gap-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 shadow-sm hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-50 transition-colors"
+            >
+              {exporting === 'excel' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+              Excel
+            </button>
+            <button
+              onClick={() => handleExport('pdf')}
+              disabled={loading || allSorted.length === 0 || exporting !== null}
+              className="flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-400 shadow-sm hover:bg-red-100 dark:hover:bg-red-950/50 disabled:opacity-50 transition-colors"
+            >
+              {exporting === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              PDF
+            </button>
+          </div>
         </div>
       )}
 
@@ -516,6 +565,15 @@ export function ApplicationsPanel({ onNavigate }: Props) {
                   <BadgeCheck className="h-3.5 w-3.5 text-white/80" />
                   <span className="text-xs font-bold text-white">Approved</span>
                   <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">{loading ? '…' : cnt.ap}</span>
+                  <button
+                    onClick={handleExportApproved}
+                    disabled={loading || approvedApps.length === 0 || exportingApproved}
+                    title="Export approved applications to Excel"
+                    className="ml-1 flex items-center gap-1 rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-white/30 disabled:opacity-40 transition-colors"
+                  >
+                    {exportingApproved ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileSpreadsheet className="h-3 w-3" />}
+                    Excel
+                  </button>
                 </div>
               </th>
 

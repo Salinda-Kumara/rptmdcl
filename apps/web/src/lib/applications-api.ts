@@ -48,7 +48,7 @@ export interface Application {
   payment?: Payment;
   documents?: ApplicationDocument[];
   applicantDetails?: ApplicantDetails;
-  approvals: Array<{ stage: number; status: string }>;
+  approvals: Array<{ stage: number; status: string; approvedAt?: string }>;
   remarks?: Array<{ id: string; content: string; createdAt: string; user: any }>;
 }
 

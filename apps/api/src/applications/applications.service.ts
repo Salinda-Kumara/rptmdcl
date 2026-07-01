@@ -401,6 +401,10 @@ export class ApplicationsService {
         applicationSubjects: { include: { subject: true } },
         payment: true,
         approvals: true,
+        remarks: {
+          orderBy: { createdAt: 'asc' },
+          include: { user: { select: { email: true, staffUser: { select: { name: true } } } } },
+        },
       },
       orderBy: { submittedAt: 'desc' },
     });

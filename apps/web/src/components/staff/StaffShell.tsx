@@ -11,6 +11,7 @@ import { useMyPermissions, can } from '@/lib/permissions';
 import { DashboardPanel } from './panels/DashboardPanel';
 import { ApplicationsPanel } from './panels/ApplicationsPanel';
 import { ApplicationDetailPanel } from './panels/ApplicationDetailPanel';
+import { ReportsPanel } from '@/components/admin/panels/ReportsPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 type View = 'dashboard' | 'applications' | 'app-detail' | 'payments' | 'schedules' | 'reports' | 'admin';
@@ -153,7 +154,7 @@ export function StaffShell() {
             {view === 'app-detail'   && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} />}
             {view === 'payments'     && <ComingSoon label="Payments" />}
             {view === 'schedules'    && <ComingSoon label="Schedules" />}
-            {view === 'reports'      && <ComingSoon label="Reports" />}
+            {view === 'reports'      && <ReportsPanel />}
             {view === 'admin'        && <ComingSoon label="Admin Console" />}
           </main>
         </div>

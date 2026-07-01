@@ -1,34 +1,38 @@
 'use client';
 
 import React from 'react';
-import { useAuth } from '@/lib/use-auth';
 import { useRouter, usePathname } from 'next/navigation';
+import { useAuthStore } from '@/lib/auth-store';
 
 interface ProtectedLayoutProps {
   children: React.ReactNode;
 }
 
 export function ProtectedLayout({ children }: ProtectedLayoutProps) {
-  const { isAuthenticated } = useAuth();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const router = useRouter();
   const pathname = usePathname();
 
   React.useEffect(() => {
-    if (!isAuthenticated) {
-      // Send students back to /student, staff back to their login
+    // Wait until the persisted auth state has rehydrated before deciding —
+    // otherwise a fresh tab / hard reload redirects to login prematurely.
+    if (hasHydrated && !isAuthenticated) {
       const loginPath =
         pathname?.startsWith('/dashboard/staff') || pathname?.startsWith('/dashboard/admin')
           ? '/login/staff'
           : '/student';
       router.push(loginPath);
     }
-  }, [isAuthenticated, router, pathname]);
+  }, [hasHydrated, isAuthenticated, router, pathname]);
 
-  if (!isAuthenticated) {
+  // Show a loader while hydrating or if not authenticated (redirect pending).
+  if (!hasHydrated || !isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-gray-950">
         <div className="text-center">
-          <p className="text-gray-600">Loading...</p>
+          <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-indigo-500" />
+          <p className="text-sm text-slate-500 dark:text-gray-400">Loading…</p>
         </div>
       </div>
     );

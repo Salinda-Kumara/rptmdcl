@@ -25,11 +25,13 @@ interface AuthStore {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  hasHydrated: boolean;
 
   setUser: (user: User | null) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setHasHydrated: (v: boolean) => void;
   logout: () => void;
 }
 
@@ -42,6 +44,7 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      hasHydrated: false,
 
       setUser: (user) =>
         set({
@@ -60,6 +63,8 @@ export const useAuthStore = create<AuthStore>()(
 
       setError: (error) => set({ error }),
 
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+
       logout: () =>
         set({
           user: null,
@@ -77,6 +82,11 @@ export const useAuthStore = create<AuthStore>()(
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
+      // Mark hydration complete so guards can wait for persisted state
+      // to load (critical for fresh tabs / hard reloads).
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

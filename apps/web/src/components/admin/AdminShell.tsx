@@ -22,6 +22,7 @@ import { ApplicationDetailPanel } from '@/components/staff/panels/ApplicationDet
 
 import { StudentsPanel }       from './panels/StudentsPanel';
 import { StudentManagePanel }  from './panels/StudentManagePanel';
+import { ReportsPanel }        from './panels/ReportsPanel';
 import { ThemeToggle }         from '@/components/ThemeToggle';
 
 type View =
@@ -257,7 +258,7 @@ export function AdminShell() {
             {view === 'applications'   && <ApplicationsPanel onNavigate={navigate} />}
             {view === 'app-detail'     && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} />}
             {view === 'payments'       && <ComingSoon label="Payments" />}
-            {view === 'reports'        && <ComingSoon label="Reports" />}
+            {view === 'reports'        && <ReportsPanel />}
             {view === 'users'          && <UsersPanel />}
             {view === 'students-import' && <StudentsPanel onNavigate={navigate} />}
             {view === 'students'       && <StudentManagePanel />}
