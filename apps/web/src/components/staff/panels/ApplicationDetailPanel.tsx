@@ -4,11 +4,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, FileText, Paperclip, ExternalLink, MessageSquare,
   CheckCircle2, XCircle, AlertCircle, Send, User, Loader2,
-  ClipboardCheck, Image as ImageIcon, ChevronDown, BookOpen, Wallet,
+  ClipboardCheck, Image as ImageIcon, ChevronDown, BookOpen, Wallet, Printer,
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { useMyPermissions, can } from '@/lib/permissions';
 import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS } from '@/lib/applications-api';
+import { printApplicationPacket } from '@/lib/application-form-pdf';
 
 const APPLICANT_FIELDS: { key: string; label: string }[] = [
   { key: 'fullName',           label: 'Full Name' },
@@ -167,6 +168,7 @@ export function ApplicationDetailPanel({ id, onBack }: Props) {
   const [busyDoc, setBusyDoc]   = useState<string | null>(null);
   const [verified, setVerified] = useState<Set<string>>(new Set());
   const [openSec, setOpenSec]   = useState(new Set(['ap', 'su', 'do']));
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     setLoading(true); setApp(null); setVerified(new Set()); setOpenSec(new Set(['ap', 'su', 'do']));
@@ -276,10 +278,26 @@ export function ApplicationDetailPanel({ id, onBack }: Props) {
 
   return (
     <div>
-      <button onClick={onBack}
-        className="mb-5 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
-        <ArrowLeft className="h-4 w-4" /> Back to Applications
-      </button>
+      <div className="mb-5 flex items-center justify-between">
+        <button onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
+          <ArrowLeft className="h-4 w-4" /> Back to Applications
+        </button>
+        {app && app.status !== 'DRAFT' && (
+          <button
+            onClick={async () => {
+              if (printing) return;
+              setPrinting(true);
+              try { await printApplicationPacket(app); } catch (e) { console.error(e); } finally { setPrinting(false); }
+            }}
+            disabled={printing}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          >
+            {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+            Print Application
+          </button>
+        )}
+      </div>
 
       {loading ? (
         <div className="space-y-4">

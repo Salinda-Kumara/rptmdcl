@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3, Calendar, CalendarRange, FileSpreadsheet, FileText,
-  Loader2, Inbox, FileClock, Wallet, CheckCircle2, XCircle, ExternalLink,
+  Loader2, Inbox, FileClock, Wallet, CheckCircle2, XCircle, ExternalLink, Printer,
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { formatFee } from '@/lib/applications-api';
 import { exportApplicationsExcel, exportApplicationsPdf } from '@/lib/export-applications';
+import { printApplicationById } from '@/lib/application-form-pdf';
 
 type DateMode = 'single' | 'range';
 
@@ -46,6 +47,20 @@ export function ReportsPanel() {
   const [error, setError] = useState('');
   // Card quick-filter (client-side view filter on the loaded set).
   const [cardFilter, setCardFilter] = useState<'all' | 'new' | 'finance' | 'approved' | 'rejected'>('all');
+  const [printing, setPrinting] = useState<string | null>(null);
+
+  const doPrint = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (printing) return;
+    setPrinting(id);
+    try {
+      await printApplicationById(id);
+    } catch (err) {
+      console.error('Print failed', err);
+    } finally {
+      setPrinting(null);
+    }
+  };
 
   // Auto-load on mount and whenever filters change (debounced).
   const load = useCallback(async () => {
@@ -323,8 +338,18 @@ export function ReportsPanel() {
                           ? <span className="line-clamp-2" title={a.remarks.map((r) => r.content).join(' | ')}>{a.remarks.map((r) => r.content).join(' | ')}</span>
                           : <span className="text-slate-300 dark:text-gray-700">—</span>}
                       </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <ExternalLink className="ml-auto h-3.5 w-3.5 text-slate-300 dark:text-gray-600" />
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={(e) => doPrint(a.id, e)}
+                            disabled={printing !== null}
+                            title="Print application form + attachments"
+                            className="rounded-md p-1.5 text-slate-400 hover:bg-amber-100 hover:text-amber-600 dark:hover:bg-amber-900/30 disabled:opacity-40 transition-colors"
+                          >
+                            {printing === a.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+                          </button>
+                          <ExternalLink className="h-3.5 w-3.5 text-slate-300 dark:text-gray-600" />
+                        </div>
                       </td>
                     </tr>
                   ))}

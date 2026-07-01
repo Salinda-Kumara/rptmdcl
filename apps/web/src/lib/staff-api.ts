@@ -61,6 +61,13 @@ export const staffApi = {
     return URL.createObjectURL(res.data);
   },
 
+  // Raw bytes of a document — used to merge attachments into a printed form.
+  documentBytes: async (documentId: string): Promise<{ bytes: Uint8Array; mimeType: string }> => {
+    const res = await apiClient.get(`/documents/${documentId}/download`, { responseType: 'arraybuffer' });
+    const mimeType = (res.headers?.['content-type'] as string) || 'application/octet-stream';
+    return { bytes: new Uint8Array(res.data as ArrayBuffer), mimeType };
+  },
+
   getProfile: () => apiClient.get('/auth/profile').then((r) => r.data),
 };
 
