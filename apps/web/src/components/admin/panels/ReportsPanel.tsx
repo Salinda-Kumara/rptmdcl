@@ -8,7 +8,7 @@ import {
 import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { formatFee } from '@/lib/applications-api';
 import { exportApplicationsExcel, exportApplicationsPdf } from '@/lib/export-applications';
-import { printApplicationById } from '@/lib/application-form-pdf';
+import { printApplicationById, openBlankTab } from '@/lib/application-form-pdf';
 
 type DateMode = 'single' | 'range';
 
@@ -52,9 +52,10 @@ export function ReportsPanel() {
   const doPrint = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (printing) return;
+    const win = openBlankTab(); // open synchronously to keep the user-gesture
     setPrinting(id);
     try {
-      await printApplicationById(id);
+      await printApplicationById(id, win);
     } catch (err) {
       console.error('Print failed', err);
     } finally {

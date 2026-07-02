@@ -9,7 +9,7 @@ import {
 import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { useMyPermissions, can } from '@/lib/permissions';
 import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS } from '@/lib/applications-api';
-import { printApplicationPacket } from '@/lib/application-form-pdf';
+import { printApplicationPacket, openBlankTab } from '@/lib/application-form-pdf';
 
 const APPLICANT_FIELDS: { key: string; label: string }[] = [
   { key: 'fullName',           label: 'Full Name' },
@@ -287,8 +287,9 @@ export function ApplicationDetailPanel({ id, onBack }: Props) {
           <button
             onClick={async () => {
               if (printing) return;
+              const win = openBlankTab(); // open synchronously to keep the user-gesture
               setPrinting(true);
-              try { await printApplicationPacket(app); } catch (e) { console.error(e); } finally { setPrinting(false); }
+              try { await printApplicationPacket(app, win); } catch (e) { console.error(e); } finally { setPrinting(false); }
             }}
             disabled={printing}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"

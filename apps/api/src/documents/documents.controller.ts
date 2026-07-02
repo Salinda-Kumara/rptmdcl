@@ -19,8 +19,10 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { DocumentsService } from './documents.service';
 import { MAX_FILE_SIZE } from './documents.constants';
 
+// Under PBAC, req.user carries { isAdmin, staffUser, student, permissions } — no roles.
+// A staff member is any admin or user with a staffUser profile (i.e. not a student).
 function isStaffUser(user: any): boolean {
-  return Array.isArray(user?.roles) && user.roles.some((r: any) => r?.role?.name && r.role.name !== 'STUDENT');
+  return !!(user?.isAdmin || user?.staffUser);
 }
 
 @ApiTags('Documents')

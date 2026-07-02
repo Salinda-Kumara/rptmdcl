@@ -62,10 +62,13 @@ export const staffApi = {
   },
 
   // Raw bytes of a document — used to merge attachments into a printed form.
+  // Fetch as a blob (same proven path as documentUrl), then read its ArrayBuffer.
   documentBytes: async (documentId: string): Promise<{ bytes: Uint8Array; mimeType: string }> => {
-    const res = await apiClient.get(`/documents/${documentId}/download`, { responseType: 'arraybuffer' });
-    const mimeType = (res.headers?.['content-type'] as string) || 'application/octet-stream';
-    return { bytes: new Uint8Array(res.data as ArrayBuffer), mimeType };
+    const res = await apiClient.get(`/documents/${documentId}/download`, { responseType: 'blob' });
+    const blob = res.data as Blob;
+    const buf = await blob.arrayBuffer();
+    const mimeType = blob.type || (res.headers?.['content-type'] as string) || 'application/octet-stream';
+    return { bytes: new Uint8Array(buf), mimeType };
   },
 
   getProfile: () => apiClient.get('/auth/profile').then((r) => r.data),
