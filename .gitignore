@@ -20,6 +20,8 @@ build/
 
 # Logs
 logs/
+# …but not the API's logs source module
+!apps/api/src/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*

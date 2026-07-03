@@ -3,9 +3,11 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import * as argon2 from 'argon2';
 import { PrismaService } from '@/prisma/prisma.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto } from './dtos/application.dto';
 
 // Fee structure in LKR (whole rupees, as per the physical form)
 // Medical (re-sit on medical ground): LKR 5,200 per subject
@@ -445,6 +447,107 @@ export class ApplicationsService {
       pendingPayments: pendingPayment,
       verifiedRevenue: revenue._sum.amount ?? 0,
     };
+  }
+
+  // Roll an application back one stage. Used to correct a wrongly-processed
+  // application (e.g. accepted by mistake). Reverts the status AND the related
+  // approval / payment records so the earlier stage can act on it again, and
+  // records an audit remark. Gated by the `rollback` permission at the route.
+  private static readonly ROLLBACK_PREV: Record<string, string> = {
+    APPROVED:         'PAYMENT_VERIFIED',
+    PAYMENT_VERIFIED: 'PAYMENT_PENDING',
+    PAYMENT_REJECTED: 'PAYMENT_PENDING',
+    PAYMENT_PENDING:  'SUBMITTED',
+    REJECTED:         'SUBMITTED',
+  };
+
+  async rollback(userId: string, id: string, dto: RollbackDto) {
+    // Confirm the acting user's identity before this destructive action.
+    // The password MUST match the currently-logged-in user's own password —
+    // another user's password will not authorise the rollback.
+    if (!dto.password || !dto.password.trim()) {
+      throw new UnauthorizedException('Your password is required to confirm a rollback');
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.password || user.deletedAt) {
+      throw new UnauthorizedException('Password confirmation is not available for this account');
+    }
+    let passwordValid = false;
+    try {
+      passwordValid = await argon2.verify(user.password, dto.password);
+    } catch {
+      passwordValid = false;
+    }
+    if (!passwordValid) {
+      throw new UnauthorizedException('Incorrect password');
+    }
+
+    const application = await this.prisma.application.findFirst({
+      where: { id, deletedAt: null },
+      include: { payment: true },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+
+    const prev = ApplicationsService.ROLLBACK_PREV[application.status];
+    if (!prev) {
+      throw new BadRequestException(
+        `An application in status ${application.status} cannot be rolled back`,
+      );
+    }
+
+    const ops: any[] = [
+      this.prisma.application.update({ where: { id }, data: { status: prev } }),
+    ];
+
+    switch (application.status) {
+      // Undo a Finance decision → reopen the payment-verification stage.
+      case 'PAYMENT_VERIFIED':
+      case 'PAYMENT_REJECTED':
+        ops.push(
+          this.prisma.approval.updateMany({
+            where: { applicationId: id, stage: 2 },
+            data: { status: 'PENDING', approvedBy: null, approvedAt: null },
+          }),
+        );
+        if (application.payment) {
+          ops.push(
+            this.prisma.payment.update({
+              where: { applicationId: id },
+              data: { verificationStatus: 'PENDING', verifiedBy: null, verifiedAt: null },
+            }),
+          );
+        }
+        break;
+
+      // Undo the Exam Division forward → reopen the exam stage and drop the
+      // finance stage that the forward created.
+      case 'PAYMENT_PENDING':
+        ops.push(
+          this.prisma.approval.updateMany({
+            where: { applicationId: id, stage: 1 },
+            data: { status: 'PENDING', approvedBy: null, approvedAt: null },
+          }),
+          this.prisma.approval.deleteMany({ where: { applicationId: id, stage: 2 } }),
+        );
+        break;
+
+      // Undo an Exam Division rejection → reopen the exam stage.
+      case 'REJECTED':
+        ops.push(
+          this.prisma.approval.updateMany({
+            where: { applicationId: id, stage: 1 },
+            data: { status: 'PENDING', approvedBy: null, approvedAt: null },
+          }),
+        );
+        break;
+    }
+
+    const note = `Status rolled back from ${application.status} to ${prev}`;
+    const content = dto.remark && dto.remark.trim() ? `${note}. ${dto.remark.trim()}` : note;
+    ops.push(this.prisma.remark.create({ data: { applicationId: id, userId, content } }));
+
+    await this.prisma.$transaction(ops);
+    return this.findOneStaff(id);
   }
 
   async findOneStaff(id: string) {

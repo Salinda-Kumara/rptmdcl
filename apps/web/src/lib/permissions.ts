@@ -15,6 +15,7 @@ export interface ResourceDef {
 export const RESOURCES: ResourceDef[] = [
   { key: 'applications', label: 'Applications', description: 'Full can verify, forward and reject' },
   { key: 'payments', label: 'Payments', description: 'Full can approve / reject payment verification' },
+  { key: 'rollback', label: 'Application Rollback', description: 'Full can roll an application back to its previous status' },
   { key: 'students', label: 'Students', description: 'Full can create, edit, delete and import' },
   { key: 'programmes', label: 'Programmes', description: 'Full can manage programmes' },
   { key: 'subjects', label: 'Subjects', description: 'Full can manage subjects' },

@@ -79,7 +79,6 @@ const EMPTY_APPLICANT: ApplicantForm = {
 const CATEGORY_OPTIONS: Record<AppType, { value: Category; label: string }[]> = {
   REPEAT: [
     { value: 'REPEAT', label: 'Repeat' },
-    { value: '1ST_ATTEMPT', label: '1st Attempt' },
   ],
   MEDICAL: [
     { value: 'MEDICAL', label: 'Medical' },
@@ -589,7 +588,7 @@ export default function NewApplicationPage() {
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {([
                 { type: 'REPEAT' as AppType, title: 'Repeat / Re-Repeat', desc: 'Repeat a failed subject', fee: 2600, icon: RefreshCw, tint: 'blue' },
-                { type: 'MEDICAL' as AppType, title: 'Medical Grounds', desc: 'Re-sit on medical grounds', fee: 5200, icon: HeartPulse, tint: 'rose' },
+                { type: 'MEDICAL' as AppType, title: 'Medical Application', desc: 'Re-sit on medical grounds', fee: 5200, icon: HeartPulse, tint: 'rose' },
               ]).map(({ type, title, desc, fee, icon: Icon, tint }) => {
                 const active = appType === type;
                 return (
@@ -633,14 +632,23 @@ export default function NewApplicationPage() {
               <p className="mb-3 text-xs text-amber-700">
                 Pay the examination fee to the account below before submitting. Keep the deposit slip / transaction reference.
               </p>
-              <dl className="grid grid-cols-1 gap-1.5 text-xs sm:grid-cols-2">
-                <div className="flex justify-between gap-2 sm:col-span-2">
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-2.5 text-xs sm:grid-cols-2">
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
                   <dt className="text-amber-600">Account Name</dt>
-                  <dd className="text-right font-medium text-amber-900">{BANK_DETAILS.name}</dd>
+                  <dd className="font-medium text-amber-900">{BANK_DETAILS.name}</dd>
                 </div>
-                <div className="flex justify-between"><dt className="text-amber-600">Bank</dt><dd className="font-medium text-amber-900">{BANK_DETAILS.bank}</dd></div>
-                <div className="flex justify-between"><dt className="text-amber-600">Branch</dt><dd className="font-medium text-amber-900">{BANK_DETAILS.branch}</dd></div>
-                <div className="flex justify-between sm:col-span-2"><dt className="text-amber-600">Account No</dt><dd className="font-mono font-bold text-amber-900">{BANK_DETAILS.account}</dd></div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-amber-600">Bank</dt>
+                  <dd className="font-medium text-amber-900">{BANK_DETAILS.bank}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-amber-600">Branch</dt>
+                  <dd className="font-medium text-amber-900">{BANK_DETAILS.branch}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <dt className="text-amber-600">Account No</dt>
+                  <dd className="font-mono font-bold tracking-wide text-amber-900">{BANK_DETAILS.account}</dd>
+                </div>
               </dl>
             </div>
 
