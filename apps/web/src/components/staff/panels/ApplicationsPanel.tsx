@@ -32,7 +32,7 @@ interface SubCol {
 }
 
 const COLS: SubCol[] = [
-  { key: 'ex-new',      label: 'New',      icon: FileClock,    subBg: 'bg-blue-50',    subText: 'text-blue-600',    cellBg: 'bg-blue-50/30',    dot: 'bg-blue-500',    cardBg: 'bg-blue-50',    cardBorder: 'border-blue-200',    cardText: 'text-blue-700' },
+  { key: 'ex-new',      label: 'Pending',  icon: FileClock,    subBg: 'bg-blue-50',    subText: 'text-blue-600',    cellBg: 'bg-blue-50/30',    dot: 'bg-blue-500',    cardBg: 'bg-blue-50',    cardBorder: 'border-blue-200',    cardText: 'text-blue-700' },
   { key: 'ex-verified', label: 'Verified', icon: CheckCircle2, subBg: 'bg-sky-50',     subText: 'text-sky-600',     cellBg: 'bg-sky-50/30',     dot: 'bg-sky-500',     cardBg: 'bg-sky-50',     cardBorder: 'border-sky-200',     cardText: 'text-sky-700' },
   { key: 'ex-rejected', label: 'Rejected', icon: ShieldAlert,  subBg: 'bg-orange-50',  subText: 'text-orange-600',  cellBg: 'bg-orange-50/30',  dot: 'bg-orange-400',  cardBg: 'bg-orange-50',  cardBorder: 'border-orange-200',  cardText: 'text-orange-700' },
   { key: 'fi-pending',  label: 'Pending',  icon: Wallet,       subBg: 'bg-amber-50',   subText: 'text-amber-600',   cellBg: 'bg-amber-50/30',   dot: 'bg-amber-500',   cardBg: 'bg-amber-50',   cardBorder: 'border-amber-200',   cardText: 'text-amber-700' },
@@ -63,7 +63,7 @@ const DONE_BEFORE: Record<ColKey, ColKey[]> = {
   'approved':    ['ex-new', 'ex-verified', 'fi-pending', 'fi-verified'],
 };
 
-type Tab = 'new' | 'all';
+type Tab = 'new' | 'finance' | 'approved' | 'all';
 
 export function ApplicationsPanel({ onNavigate }: Props) {
   const { isAdmin, permissions } = useMyPermissions();
@@ -81,10 +81,9 @@ export function ApplicationsPanel({ onNavigate }: Props) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [serialSort, setSerialSort] = useState<'asc' | 'desc' | null>(null);
-  const [allSortCol, setAllSortCol] = useState<ColKey | null>(null);
-  const [allSortDir, setAllSortDir] = useState<'asc' | 'desc'>('asc');
+  // All-tab column filter: a specific stage (ColKey) or a whole group ('ex' | 'fi').
+  const [colFilter, setColFilter] = useState<ColKey | 'ex' | 'fi' | null>(null);
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
-  const [exportingApproved, setExportingApproved] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -109,27 +108,19 @@ export function ApplicationsPanel({ onNavigate }: Props) {
     return true;
   });
 
-  // Sort the All-tab rows when a sub-column header is clicked
-  const allSorted = allSortCol
-    ? [...filtered].sort((a, b) => {
-        const aCol = getActiveCol(a.status);
-        const bCol = getActiveCol(b.status);
-        const aMatch = aCol === allSortCol ? 0 : 1;
-        const bMatch = bCol === allSortCol ? 0 : 1;
-        if (aMatch !== bMatch) return allSortDir === 'asc' ? aMatch - bMatch : bMatch - aMatch;
-        // Within the same group, sort by serialNumber
-        return (a.serialNumber ?? '').localeCompare(b.serialNumber ?? '');
-      })
-    : filtered;
+  // All-tab rows: filter to the clicked stage/group column, if any.
+  const matchesColFilter = (app: StaffApplication) => {
+    if (!colFilter) return true;
+    const k = getActiveCol(app.status);
+    if (colFilter === 'ex') return k.startsWith('ex');
+    if (colFilter === 'fi') return k.startsWith('fi');
+    return k === colFilter;
+  };
+  const allSorted = filtered.filter(matchesColFilter);
 
-  const handleAllSort = (col: ColKey) => {
-    if (allSortCol === col) {
-      if (allSortDir === 'asc') setAllSortDir('desc');
-      else { setAllSortCol(null); setAllSortDir('asc'); }
-    } else {
-      setAllSortCol(col);
-      setAllSortDir('asc');
-    }
+  // Toggle the All-tab column filter (click again on the same column to clear).
+  const handleColFilter = (col: ColKey | 'ex' | 'fi') => {
+    setColFilter((cur) => (cur === col ? null : col));
   };
 
   const handleExport = async (kind: 'excel' | 'pdf') => {
@@ -145,19 +136,8 @@ export function ApplicationsPanel({ onNavigate }: Props) {
     }
   };
 
-  // Approved-only Excel export (PAYMENT_VERIFIED + APPROVED map to the Approved column).
+  // Applications that map to the Approved column (PAYMENT_VERIFIED + APPROVED).
   const approvedApps = filtered.filter((a) => getActiveCol(a.status) === 'approved');
-  const handleExportApproved = async () => {
-    if (exportingApproved || approvedApps.length === 0) return;
-    setExportingApproved(true);
-    try {
-      await exportApplicationsExcel(approvedApps);
-    } catch (e) {
-      console.error('Export failed', e);
-    } finally {
-      setExportingApproved(false);
-    }
-  };
 
   const cnt = { ex: 0, fi: 0, ap: 0 };
   for (const app of filtered) {
@@ -167,14 +147,20 @@ export function ApplicationsPanel({ onNavigate }: Props) {
     else cnt.ap++;
   }
 
-  const newAppsRaw = filtered.filter((a) => a.status === 'SUBMITTED');
-  const newApps = serialSort
-    ? [...newAppsRaw].sort((a, b) => {
-        const sa = a.serialNumber ?? '';
-        const sb = b.serialNumber ?? '';
-        return serialSort === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
-      })
-    : newAppsRaw;
+  const sortBySerial = (arr: StaffApplication[]) =>
+    serialSort
+      ? [...arr].sort((a, b) => {
+          const sa = a.serialNumber ?? '';
+          const sb = b.serialNumber ?? '';
+          return serialSort === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
+        })
+      : arr;
+
+  const newApps = sortBySerial(filtered.filter((a) => a.status === 'SUBMITTED'));
+  // Finance Pending — forwarded to Finance and awaiting payment verification.
+  const financeApps = sortBySerial(filtered.filter((a) => a.status === 'PAYMENT_PENDING'));
+  // Approved — payment verified / application approved (same grouping as the All-tab "Approved" column).
+  const approvedList = sortBySerial(approvedApps);
 
   /* ──────────────── Finance-only focused view ──────────────── */
   if (isFinanceOnly) {
@@ -302,6 +288,108 @@ export function ApplicationsPanel({ onNavigate }: Props) {
     );
   }
 
+  // Shared list-table used by the New / Finance Pending / Approved tabs.
+  const renderAppTable = (rows: StaffApplication[], hoverClass: string, emptyLabel: string) => {
+    if (loading) {
+      return (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex animate-pulse items-center gap-4 rounded-xl border border-slate-200 bg-white p-4">
+              <div className="h-8 w-8 rounded-lg bg-slate-100" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-1/3 rounded bg-slate-100" />
+                <div className="h-2.5 w-1/2 rounded bg-slate-100" />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (rows.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-gray-700 bg-white dark:bg-gray-900 py-20 text-center">
+          <Inbox className="h-10 w-10 text-slate-300 dark:text-gray-600" />
+          <p className="mt-3 text-sm font-medium text-slate-500 dark:text-gray-400">{emptyLabel}</p>
+          <p className="mt-1 text-xs text-slate-400 dark:text-gray-600">
+            {search || typeFilter ? 'Try adjusting the filters.' : ''}
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/60 text-left">
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 w-8">#</th>
+              <th className="px-4 py-2.5">
+                <button
+                  onClick={() => setSerialSort((s) => s === 'asc' ? 'desc' : s === 'desc' ? null : 'asc')}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                  Serial No.
+                  <span className="flex flex-col leading-none text-[8px]">
+                    <span className={serialSort === 'asc' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-300 dark:text-gray-700'}>▲</span>
+                    <span className={serialSort === 'desc' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-300 dark:text-gray-700'}>▼</span>
+                  </span>
+                </button>
+              </th>
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Registration No.</th>
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Student</th>
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Type</th>
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 text-center">Subjects</th>
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 text-right">Fee</th>
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Submitted</th>
+              <th className="w-8" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((app, i) => (
+              <tr key={app.id}
+                onClick={() => onNavigate('app-detail', app.id)}
+                className={`cursor-pointer border-t border-slate-100 dark:border-gray-800 transition-colors ${i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-slate-50/50 dark:bg-gray-900/60'} ${hoverClass}`}>
+                <td className="px-4 py-3 text-center">
+                  <span className="flex h-5 w-5 mx-auto items-center justify-center rounded bg-slate-700 dark:bg-gray-600 text-[9px] font-bold text-white">{i + 1}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className="rounded bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">
+                    {app.serialNumber || '—'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700 dark:text-gray-300">
+                  {app.student?.registrationNumber || '—'}
+                </td>
+                <td className="px-4 py-3">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{app.student?.fullName || '—'}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-gray-600">{app.student?.batchNumber}</p>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                    app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'
+                  }`}>
+                    {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-center text-xs font-semibold text-slate-700 dark:text-gray-300">
+                  {app.applicationSubjects?.length ?? 0}
+                </td>
+                <td className="px-4 py-3 text-right text-xs font-bold text-slate-800 dark:text-gray-200">
+                  {formatFee(app.totalFee)}
+                </td>
+                <td className="px-4 py-3 text-xs text-slate-400 dark:text-gray-600">
+                  {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                </td>
+                <td className="pr-3 text-slate-300 dark:text-gray-600">
+                  <ChevronRight className="h-4 w-4" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* Header */}
@@ -328,49 +416,8 @@ export function ApplicationsPanel({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="mb-4 flex gap-1 rounded-xl border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 p-1 w-fit">
-        <button
-          onClick={() => setTab('new')}
-          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-            tab === 'new'
-              ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-400 shadow-sm'
-              : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
-          }`}
-        >
-          <FileClock className="h-4 w-4" />
-          New Applications
-          {!loading && (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-              tab === 'new' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400'
-            }`}>
-              {newApps.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setTab('all')}
-          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-            tab === 'all'
-              ? 'bg-white dark:bg-gray-700 text-indigo-700 dark:text-indigo-400 shadow-sm'
-              : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
-          }`}
-        >
-          <ClipboardList className="h-4 w-4" />
-          All
-          {!loading && (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-              tab === 'all' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400'
-            }`}>
-              {filtered.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* ── All tab date filter bar ── */}
-      {tab === 'all' && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+      {/* ── Date filter bar (shared across all tabs) ── */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
           <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 shrink-0">Filter by date:</span>
           <div className="flex items-center gap-2">
             <label className="text-[10px] font-medium text-slate-400 dark:text-gray-600">From</label>
@@ -400,128 +447,131 @@ export function ApplicationsPanel({ onNavigate }: Props) {
             </button>
           )}
 
-          {/* Export buttons */}
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 dark:text-gray-600">
-              {loading ? '…' : `${allSorted.length} record${allSorted.length !== 1 ? 's' : ''}`}
-            </span>
-            <button
-              onClick={() => handleExport('excel')}
-              disabled={loading || allSorted.length === 0 || exporting !== null}
-              className="flex items-center gap-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 shadow-sm hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-50 transition-colors"
-            >
-              {exporting === 'excel' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
-              Excel
-            </button>
-            <button
-              onClick={() => handleExport('pdf')}
-              disabled={loading || allSorted.length === 0 || exporting !== null}
-              className="flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-400 shadow-sm hover:bg-red-100 dark:hover:bg-red-950/50 disabled:opacity-50 transition-colors"
-            >
-              {exporting === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              PDF
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Tab: New Applications ── */}
-      {tab === 'new' && (
-        <div>
-          {loading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex animate-pulse items-center gap-4 rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="h-8 w-8 rounded-lg bg-slate-100" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 w-1/3 rounded bg-slate-100" />
-                    <div className="h-2.5 w-1/2 rounded bg-slate-100" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : newApps.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-gray-700 bg-white dark:bg-gray-900 py-20 text-center">
-              <Inbox className="h-10 w-10 text-slate-300 dark:text-gray-600" />
-              <p className="mt-3 text-sm font-medium text-slate-500 dark:text-gray-400">No new applications</p>
-              <p className="mt-1 text-xs text-slate-400 dark:text-gray-600">
-                {search || typeFilter ? 'Try adjusting the filters.' : 'All submissions have been reviewed.'}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/60 text-left">
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 w-8">#</th>
-                    <th className="px-4 py-2.5">
-                      <button
-                        onClick={() => setSerialSort((s) => s === 'asc' ? 'desc' : s === 'desc' ? null : 'asc')}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                      >
-                        Serial No.
-                        <span className="flex flex-col leading-none text-[8px]">
-                          <span className={serialSort === 'asc' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-300 dark:text-gray-700'}>▲</span>
-                          <span className={serialSort === 'desc' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-300 dark:text-gray-700'}>▼</span>
-                        </span>
-                      </button>
-                    </th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Registration No.</th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Student</th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Type</th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 text-center">Subjects</th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 text-right">Fee</th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Submitted</th>
-                    <th className="w-8" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {newApps.map((app, i) => (
-                    <tr key={app.id}
-                      onClick={() => onNavigate('app-detail', app.id)}
-                      className={`cursor-pointer border-t border-slate-100 dark:border-gray-800 transition-colors ${i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-slate-50/50 dark:bg-gray-900/60'} hover:bg-blue-50/50 dark:hover:bg-blue-900/10`}>
-                      <td className="px-4 py-3 text-center">
-                        <span className="flex h-5 w-5 mx-auto items-center justify-center rounded bg-slate-700 dark:bg-gray-600 text-[9px] font-bold text-white">{i + 1}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="rounded bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">
-                          {app.serialNumber || '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700 dark:text-gray-300">
-                        {app.student?.registrationNumber || '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{app.student?.fullName || '—'}</p>
-                        <p className="text-[10px] text-slate-400 dark:text-gray-600">{app.student?.batchNumber}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                          app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'
-                        }`}>
-                          {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs font-semibold text-slate-700 dark:text-gray-300">
-                        {app.applicationSubjects?.length ?? 0}
-                      </td>
-                      <td className="px-4 py-3 text-right text-xs font-bold text-slate-800 dark:text-gray-200">
-                        {formatFee(app.totalFee)}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-400 dark:text-gray-600">
-                        {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                      </td>
-                      <td className="pr-3 text-slate-300 dark:text-gray-600">
-                        <ChevronRight className="h-4 w-4" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Export buttons — All tab only */}
+          {tab === 'all' && (
+            <div className="ml-auto flex items-center gap-2">
+              {colFilter && (
+                <button
+                  onClick={() => setColFilter(null)}
+                  title="Clear column filter"
+                  className="flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                >
+                  Filtered: {
+                    colFilter === 'ex' ? 'Exam Division'
+                      : colFilter === 'fi' ? 'Finance'
+                      : colFilter === 'approved' ? 'Approved'
+                      : `${colFilter.startsWith('ex') ? 'Exam' : 'Finance'} · ${COLS.find((c) => c.key === colFilter)?.label ?? colFilter}`
+                  }
+                  <XCircle className="h-3 w-3" />
+                </button>
+              )}
+              <span className="text-[10px] text-slate-400 dark:text-gray-600">
+                {loading ? '…' : `${allSorted.length} record${allSorted.length !== 1 ? 's' : ''}`}
+              </span>
+              <button
+                onClick={() => handleExport('excel')}
+                disabled={loading || allSorted.length === 0 || exporting !== null}
+                className="flex items-center gap-1.5 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 shadow-sm hover:bg-emerald-100 dark:hover:bg-emerald-950/50 disabled:opacity-50 transition-colors"
+              >
+                {exporting === 'excel' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+                Excel
+              </button>
+              <button
+                onClick={() => handleExport('pdf')}
+                disabled={loading || allSorted.length === 0 || exporting !== null}
+                className="flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-1.5 text-xs font-semibold text-red-700 dark:text-red-400 shadow-sm hover:bg-red-100 dark:hover:bg-red-950/50 disabled:opacity-50 transition-colors"
+              >
+                {exporting === 'pdf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                PDF
+              </button>
             </div>
           )}
         </div>
-      )}
+
+      {/* Tabs */}
+      <div className="mb-4 flex gap-1 rounded-xl border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-800 p-1 w-fit">
+        <button
+          onClick={() => setTab('new')}
+          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+            tab === 'new'
+              ? 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-400 shadow-sm'
+              : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
+          }`}
+        >
+          <FileClock className="h-4 w-4" />
+          New Applications
+          {!loading && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              tab === 'new' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400'
+            }`}>
+              {newApps.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('finance')}
+          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+            tab === 'finance'
+              ? 'bg-white dark:bg-gray-700 text-amber-700 dark:text-amber-400 shadow-sm'
+              : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
+          }`}
+        >
+          <Wallet className="h-4 w-4" />
+          Finance Pending
+          {!loading && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              tab === 'finance' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400'
+            }`}>
+              {financeApps.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('approved')}
+          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+            tab === 'approved'
+              ? 'bg-white dark:bg-gray-700 text-teal-700 dark:text-teal-400 shadow-sm'
+              : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
+          }`}
+        >
+          <BadgeCheck className="h-4 w-4" />
+          Approved
+          {!loading && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              tab === 'approved' ? 'bg-teal-100 text-teal-700' : 'bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400'
+            }`}>
+              {approvedList.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('all')}
+          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+            tab === 'all'
+              ? 'bg-white dark:bg-gray-700 text-indigo-700 dark:text-indigo-400 shadow-sm'
+              : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
+          }`}
+        >
+          <ClipboardList className="h-4 w-4" />
+          All
+          {!loading && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              tab === 'all' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400'
+            }`}>
+              {filtered.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Tab: New Applications ── */}
+      {tab === 'new' && renderAppTable(newApps, 'hover:bg-blue-50/50 dark:hover:bg-blue-900/10', 'No new applications')}
+
+      {/* ── Tab: Finance Pending ── */}
+      {tab === 'finance' && renderAppTable(financeApps, 'hover:bg-amber-50/50 dark:hover:bg-amber-900/10', 'No applications pending payment verification')}
+
+      {/* ── Tab: Approved ── */}
+      {tab === 'approved' && renderAppTable(approvedList, 'hover:bg-teal-50/50 dark:hover:bg-teal-900/10', 'No approved applications yet')}
 
       {/* ── Tab: All (status table) ── */}
       {tab === 'all' && (
@@ -531,50 +581,68 @@ export function ApplicationsPanel({ onNavigate }: Props) {
 
             {/* Group row */}
             <tr>
-              <th rowSpan={2} className="w-8 border-b border-r-2 border-slate-300 bg-slate-800 p-0">
-                <div className="flex items-center justify-center py-2">
-                  <span className="text-[9px] font-bold text-slate-400">#</span>
-                </div>
+              <th rowSpan={2} className="w-8 border-b border-slate-300 bg-slate-800 p-0">
+                <span className="text-[9px] font-bold text-slate-400">#</span>
               </th>
 
+              {/* Info columns */}
+              <th rowSpan={2} className="border-b border-slate-200 bg-slate-700 p-0">
+                <button
+                  onClick={() => setSerialSort((s) => s === 'asc' ? 'desc' : s === 'desc' ? null : 'asc')}
+                  className="flex w-full items-center justify-center gap-1 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white/90 hover:text-white transition-colors"
+                >
+                  Serial No.
+                  <span className="flex flex-col leading-none text-[7px]">
+                    <span className={serialSort === 'asc' ? 'text-white' : 'text-white/30'}>▲</span>
+                    <span className={serialSort === 'desc' ? 'text-white' : 'text-white/30'}>▼</span>
+                  </span>
+                </button>
+              </th>
+              <th rowSpan={2} className="border-b border-slate-200 bg-slate-700 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white/90">Registration No.</th>
+              <th rowSpan={2} className="border-b border-slate-200 bg-slate-700 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white/90">Type</th>
+              <th rowSpan={2} className="border-b border-slate-200 bg-slate-700 px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-white/90">Subjects</th>
+              <th rowSpan={2} className="border-b border-r-2 border-r-slate-300 bg-slate-700 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white/90">Submitted</th>
+
               {/* Exam Division */}
-              <th colSpan={3} className="border-b border-r-2 border-r-slate-300 bg-blue-700 p-0">
-                <div className="flex items-center justify-between px-3 py-2">
-                  <div className="flex items-center gap-1.5">
-                    <ClipboardList className="h-3.5 w-3.5 text-white/80" />
-                    <span className="text-xs font-bold text-white">Exam Division</span>
-                  </div>
+              <th colSpan={3} className={`border-b border-r-2 border-r-slate-300 bg-blue-700 p-0 ${colFilter === 'ex' ? 'ring-2 ring-inset ring-white' : ''}`}>
+                <button
+                  onClick={() => handleColFilter('ex')}
+                  title={colFilter === 'ex' ? 'Clear Exam Division filter' : 'Filter by Exam Division'}
+                  className="flex w-full items-center justify-center gap-1.5 px-3 py-2 transition-opacity hover:opacity-90"
+                >
+                  <ClipboardList className="h-3.5 w-3.5 text-white/80" />
+                  <span className="text-xs font-bold text-white">Exam Division</span>
                   <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">{loading ? '…' : cnt.ex}</span>
-                </div>
+                  {colFilter === 'ex' && <XCircle className="h-3.5 w-3.5 text-white" />}
+                </button>
               </th>
 
               {/* Finance */}
-              <th colSpan={3} className="border-b border-r-2 border-r-slate-300 bg-amber-600 p-0">
-                <div className="flex items-center justify-between px-3 py-2">
-                  <div className="flex items-center gap-1.5">
-                    <Wallet className="h-3.5 w-3.5 text-white/80" />
-                    <span className="text-xs font-bold text-white">Finance</span>
-                  </div>
+              <th colSpan={3} className={`border-b border-r-2 border-r-slate-300 bg-amber-600 p-0 ${colFilter === 'fi' ? 'ring-2 ring-inset ring-white' : ''}`}>
+                <button
+                  onClick={() => handleColFilter('fi')}
+                  title={colFilter === 'fi' ? 'Clear Finance filter' : 'Filter by Finance'}
+                  className="flex w-full items-center justify-center gap-1.5 px-3 py-2 transition-opacity hover:opacity-90"
+                >
+                  <Wallet className="h-3.5 w-3.5 text-white/80" />
+                  <span className="text-xs font-bold text-white">Finance</span>
                   <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">{loading ? '…' : cnt.fi}</span>
-                </div>
+                  {colFilter === 'fi' && <XCircle className="h-3.5 w-3.5 text-white" />}
+                </button>
               </th>
 
               {/* Approved */}
-              <th rowSpan={2} className="border-b border-slate-200 bg-teal-600 p-0">
-                <div className="flex items-center justify-center gap-1.5 px-3 py-2">
+              <th rowSpan={2} className={`border-b border-slate-200 bg-teal-600 p-0 ${colFilter === 'approved' ? 'ring-2 ring-inset ring-white' : ''}`}>
+                <button
+                  onClick={() => handleColFilter('approved')}
+                  title={colFilter === 'approved' ? 'Clear Approved filter' : 'Filter by Approved'}
+                  className="flex w-full items-center justify-center gap-1.5 px-3 py-2 transition-opacity hover:opacity-90"
+                >
                   <BadgeCheck className="h-3.5 w-3.5 text-white/80" />
                   <span className="text-xs font-bold text-white">Approved</span>
                   <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white">{loading ? '…' : cnt.ap}</span>
-                  <button
-                    onClick={handleExportApproved}
-                    disabled={loading || approvedApps.length === 0 || exportingApproved}
-                    title="Export approved applications to Excel"
-                    className="ml-1 flex items-center gap-1 rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-white/30 disabled:opacity-40 transition-colors"
-                  >
-                    {exportingApproved ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileSpreadsheet className="h-3 w-3" />}
-                    Excel
-                  </button>
-                </div>
+                  {colFilter === 'approved' && <XCircle className="h-3.5 w-3.5 text-white" />}
+                </button>
               </th>
 
               <th rowSpan={2} className="w-6 border-b border-slate-200 bg-slate-800 p-0" />
@@ -584,24 +652,18 @@ export function ApplicationsPanel({ onNavigate }: Props) {
             <tr>
               {COLS.filter((c) => c.key !== 'approved').map((c, i) => {
                 const Icon = c.icon;
-                const active = allSortCol === c.key;
+                const active = colFilter === c.key;
                 return (
                   <th key={c.key}
                     className={`border-b border-slate-200 p-0 ${i === 2 ? 'border-r-2 border-r-slate-300' : 'border-r border-slate-200'}`}>
                     <button
-                      onClick={() => handleAllSort(c.key as ColKey)}
-                      className={`flex w-full items-center justify-center gap-1 px-2 py-1.5 transition-opacity hover:opacity-80 ${c.subBg}`}
-                      title={`Sort by ${c.label}`}
+                      onClick={() => handleColFilter(c.key as ColKey)}
+                      className={`flex w-full items-center justify-center gap-1 px-2 py-1.5 transition-all hover:opacity-80 ${c.subBg} ${active ? 'ring-2 ring-inset ring-slate-500' : ''}`}
+                      title={active ? `Clear ${c.label} filter` : `Filter by ${c.label}`}
                     >
                       <Icon className={`h-3 w-3 ${c.subText}`} />
                       <span className={`text-[10px] font-semibold ${c.subText}`}>{c.label}</span>
-                      {active ? (
-                        <span className={`text-[8px] font-bold ${c.subText}`}>
-                          {allSortDir === 'asc' ? '▲' : '▼'}
-                        </span>
-                      ) : (
-                        <span className="text-[8px] text-slate-300 dark:text-gray-600">⇅</span>
-                      )}
+                      {active && <XCircle className={`h-3 w-3 ${c.subText}`} />}
                     </button>
                   </th>
                 );
@@ -613,20 +675,14 @@ export function ApplicationsPanel({ onNavigate }: Props) {
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i} className="border-t border-slate-100">
-                  <td className="border-r-2 border-slate-200 p-1.5 text-center">
-                    <div className="mx-auto h-4 w-4 animate-pulse rounded bg-slate-100" />
+                  <td colSpan={14} className="p-2">
+                    <div className="h-8 animate-pulse rounded bg-slate-100" />
                   </td>
-                  {COLS.map((c, ci) => (
-                    <td key={c.key} className={`${c.cellBg} p-1.5 ${ci === 2 || ci === 5 ? 'border-r-2 border-r-slate-300' : 'border-r border-slate-200'} last:border-0`}>
-                      {ci === i % 7 && <div className="h-14 animate-pulse rounded-lg bg-white/70 shadow-sm" />}
-                    </td>
-                  ))}
-                  <td className="p-1" />
                 </tr>
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-16 text-center">
+                <td colSpan={14} className="py-16 text-center">
                   <Inbox className="mx-auto h-8 w-8 text-slate-300" />
                   <p className="mt-2 text-sm font-medium text-slate-500">No submissions found</p>
                   <p className="mt-0.5 text-xs text-slate-400">
@@ -641,13 +697,44 @@ export function ApplicationsPanel({ onNavigate }: Props) {
 
                 return (
                   <tr key={app.id}
-                    className={`border-t border-slate-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-indigo-50/30`}>
+                    onClick={() => onNavigate('app-detail', app.id)}
+                    className={`cursor-pointer border-t border-slate-100 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-indigo-50/30`}>
 
                     {/* Row # */}
-                    <td className="border-r-2 border-slate-200 p-1.5 text-center align-middle w-8">
+                    <td className="p-1.5 text-center align-middle w-8">
                       <span className="flex h-5 w-5 mx-auto items-center justify-center rounded bg-slate-700 text-[9px] font-bold text-white">
                         {i + 1}
                       </span>
+                    </td>
+
+                    {/* Serial No. */}
+                    <td className="px-3 py-2.5 align-middle">
+                      <span className="rounded bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700">{app.serialNumber || '—'}</span>
+                    </td>
+
+                    {/* Registration No. */}
+                    <td className="px-3 py-2.5 align-middle">
+                      <p className="font-mono text-xs font-semibold text-slate-700">{app.student?.registrationNumber || '—'}</p>
+                      <p className="text-[10px] text-slate-400">{app.student?.fullName}</p>
+                    </td>
+
+                    {/* Type */}
+                    <td className="px-3 py-2.5 align-middle">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'
+                      }`}>
+                        {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'}
+                      </span>
+                    </td>
+
+                    {/* Subjects count */}
+                    <td className="px-3 py-2.5 text-center align-middle text-xs font-semibold text-slate-700">
+                      {app.applicationSubjects?.length ?? 0}
+                    </td>
+
+                    {/* Submitted */}
+                    <td className="border-r-2 border-r-slate-200 px-3 py-2.5 align-middle text-xs text-slate-500">
+                      {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                     </td>
 
                     {/* Stage cells */}
@@ -658,35 +745,18 @@ export function ApplicationsPanel({ onNavigate }: Props) {
 
                       if (isActive) {
                         return (
-                          <td key={col.key} className={`${col.cellBg} ${sep} px-1.5 py-1.5 align-middle last:border-0`}>
-                            <button
-                              onClick={() => onNavigate('app-detail', app.id)}
-                              className={`group w-full rounded-md border px-2 py-1.5 text-left transition-all hover:brightness-95 hover:shadow-sm ${col.cardBg} ${col.cardBorder}`}
-                            >
-                              {/* Serial + type */}
-                              <div className="flex items-center justify-between gap-1 mb-1">
-                                <span className={`rounded px-1 py-0.5 text-[9px] font-bold ${
-                                  app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'
-                                }`}>
-                                  {app.type === 'MEDICAL' ? 'Med' : 'Rep'}
-                                </span>
-                                {app.serialNumber && (
-                                  <span className="font-mono text-[8px] font-bold text-slate-400">#{app.serialNumber}</span>
-                                )}
-                                <span className="text-[9px] text-slate-500 font-medium">{app.applicationSubjects?.length ?? 0} subj.</span>
-                              </div>
-                              {/* Reg number */}
-                              <p className="truncate text-[10px] font-semibold text-slate-700 group-hover:text-indigo-700">
-                                {app.student?.registrationNumber || '—'}
-                              </p>
-                            </button>
+                          <td key={col.key} className={`${col.cellBg} ${sep} px-1.5 py-2.5 align-middle last:border-0`}>
+                            <div className={`mx-auto flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 shadow-sm ${col.cardBg} ${col.cardBorder}`}>
+                              <span className={`h-2 w-2 rounded-full ${col.dot}`} />
+                              <span className={`text-[8px] font-bold ${col.cardText}`}>Current</span>
+                            </div>
                           </td>
                         );
                       }
 
                       if (isDone) {
                         return (
-                          <td key={col.key} className={`${col.cellBg} ${sep} px-1.5 py-1.5 align-middle last:border-0`}>
+                          <td key={col.key} className={`${col.cellBg} ${sep} px-1.5 py-2.5 align-middle last:border-0`}>
                             <div className="mx-auto flex w-fit items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 shadow-sm">
                               <svg className="h-2.5 w-2.5 text-emerald-500 shrink-0" viewBox="0 0 12 12" fill="none">
                                 <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -697,17 +767,16 @@ export function ApplicationsPanel({ onNavigate }: Props) {
                         );
                       }
 
-                      return <td key={col.key} className={`${col.cellBg} ${sep} last:border-0`} />;
+                      return (
+                        <td key={col.key} className={`${col.cellBg} ${sep} px-1.5 py-2.5 align-middle last:border-0`}>
+                          <span className="mx-auto block h-0.5 w-3 rounded-full bg-slate-200" />
+                        </td>
+                      );
                     })}
 
                     {/* Arrow */}
                     <td className="p-1 align-middle w-6">
-                      <button onClick={() => onNavigate('app-detail', app.id)}
-                        className="flex items-center justify-center rounded p-1 text-slate-300 hover:bg-indigo-50 hover:text-indigo-500 transition-colors">
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
+                      <ChevronRight className="mx-auto h-3.5 w-3.5 text-slate-300" />
                     </td>
                   </tr>
                 );

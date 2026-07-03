@@ -169,3 +169,15 @@ export class PaymentReviewDto {
   @IsString()
   remark?: string;
 }
+
+// Roll an application back one stage (e.g. a wrongly-accepted application).
+// The acting user must re-enter their password to confirm this destructive action.
+export class RollbackDto {
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @IsOptional()
+  @IsString()
+  remark?: string;
+}

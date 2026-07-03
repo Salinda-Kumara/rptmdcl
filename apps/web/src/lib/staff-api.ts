@@ -56,6 +56,11 @@ export const staffApi = {
   financeReview: (id: string, action: 'APPROVE' | 'REJECT', remark?: string) =>
     apiClient.patch<StaffApplication>(`/applications/${id}/payment-review`, { action, remark }).then((r) => r.data),
 
+  // Roll an application back to its previous status (requires the `rollback`
+  // permission and the acting user's password for confirmation).
+  rollback: (id: string, password: string, remark?: string) =>
+    apiClient.patch<StaffApplication>(`/applications/${id}/rollback`, { password, remark }).then((r) => r.data),
+
   documentUrl: async (documentId: string) => {
     const res = await apiClient.get(`/documents/${documentId}/download`, { responseType: 'blob' });
     return URL.createObjectURL(res.data);

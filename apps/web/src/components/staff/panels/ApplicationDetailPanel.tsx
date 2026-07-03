@@ -4,9 +4,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, FileText, Paperclip, ExternalLink, MessageSquare,
   CheckCircle2, XCircle, AlertCircle, Send, User, Loader2,
-  ClipboardCheck, Image as ImageIcon, ChevronDown, BookOpen, Wallet, Printer,
+  ClipboardCheck, Image as ImageIcon, ChevronDown, BookOpen, Wallet, Printer, RotateCcw, ScrollText,
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
+import { Modal } from '@/components/admin/Modal';
 import { useMyPermissions, can } from '@/lib/permissions';
 import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS } from '@/lib/applications-api';
 import { printApplicationPacket, openBlankTab } from '@/lib/application-form-pdf';
@@ -155,9 +156,9 @@ function FieldRow({ label, value, on, onToggle, canVerify }: {
 }
 
 /* ═══════════════════════════ Panel ═══════════════════════════ */
-interface Props { id: string; onBack: () => void; }
+interface Props { id: string; onBack: () => void; onViewLogs?: (serial: string) => void; }
 
-export function ApplicationDetailPanel({ id, onBack }: Props) {
+export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
   const { isAdmin, permissions } = useMyPermissions();
   const [app, setApp]       = useState<StaffApplication | null>(null);
   const [loading, setLoading]   = useState(true);
@@ -169,6 +170,10 @@ export function ApplicationDetailPanel({ id, onBack }: Props) {
   const [verified, setVerified] = useState<Set<string>>(new Set());
   const [openSec, setOpenSec]   = useState(new Set(['ap', 'su', 'do']));
   const [printing, setPrinting] = useState(false);
+  const [showRollback, setShowRollback] = useState(false);
+  const [rollbackRemark, setRollbackRemark] = useState('');
+  const [rollbackPassword, setRollbackPassword] = useState('');
+  const [rollingBack, setRollingBack] = useState(false);
 
   useEffect(() => {
     setLoading(true); setApp(null); setVerified(new Set()); setOpenSec(new Set(['ap', 'su', 'do']));
@@ -177,6 +182,17 @@ export function ApplicationDetailPanel({ id, onBack }: Props) {
 
   const canReview = (isAdmin || can(permissions, 'applications', 'FULL')) && app?.status === 'SUBMITTED';
   const canFinance = (isAdmin || can(permissions, 'payments', 'FULL')) && app?.status === 'PAYMENT_PENDING';
+
+  // Which status a rollback would revert to (mirror of the API's ROLLBACK_PREV).
+  const ROLLBACK_PREV: Record<string, string> = {
+    APPROVED:         'PAYMENT_VERIFIED',
+    PAYMENT_VERIFIED: 'PAYMENT_PENDING',
+    PAYMENT_REJECTED: 'PAYMENT_PENDING',
+    PAYMENT_PENDING:  'SUBMITTED',
+    REJECTED:         'SUBMITTED',
+  };
+  const rollbackTarget = app ? ROLLBACK_PREV[app.status] : undefined;
+  const canRollback = !!rollbackTarget && (isAdmin || can(permissions, 'rollback', 'FULL'));
 
   // Details were already verified by the Exam Division once the app moves past
   // SUBMITTED. In that case finance (and later viewers) see them as read-only,
@@ -254,6 +270,18 @@ export function ApplicationDetailPanel({ id, onBack }: Props) {
     } finally { setActing(null); }
   };
 
+  const doRollback = async () => {
+    setError('');
+    if (!rollbackPassword) { setError('Please enter your password to confirm.'); return; }
+    setRollingBack(true);
+    try {
+      const u = await staffApi.rollback(id, rollbackPassword, rollbackRemark.trim() || undefined);
+      setApp(u); setShowRollback(false); setRollbackRemark(''); setRollbackPassword('');
+    } catch (e: any) {
+      setError(e.response?.data?.message?.toString() || 'Rollback failed');
+    } finally { setRollingBack(false); }
+  };
+
   const viewDoc = async (docId: string) => {
     setBusyDoc(docId);
     try { window.open(await staffApi.documentUrl(docId), '_blank'); }
@@ -284,19 +312,30 @@ export function ApplicationDetailPanel({ id, onBack }: Props) {
           <ArrowLeft className="h-4 w-4" /> Back to Applications
         </button>
         {app && app.status !== 'DRAFT' && (
-          <button
-            onClick={async () => {
-              if (printing) return;
-              const win = openBlankTab(); // open synchronously to keep the user-gesture
-              setPrinting(true);
-              try { await printApplicationPacket(app, win); } catch (e) { console.error(e); } finally { setPrinting(false); }
-            }}
-            disabled={printing}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-          >
-            {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-            Print Application
-          </button>
+          <div className="flex items-center gap-2">
+            {onViewLogs && app.serialNumber && (
+              <button
+                onClick={() => onViewLogs(app.serialNumber!)}
+                title="View this application's activity logs"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <ScrollText className="h-4 w-4" /> Activity Logs
+              </button>
+            )}
+            <button
+              onClick={async () => {
+                if (printing) return;
+                const win = openBlankTab(); // open synchronously to keep the user-gesture
+                setPrinting(true);
+                try { await printApplicationPacket(app, win); } catch (e) { console.error(e); } finally { setPrinting(false); }
+              }}
+              disabled={printing}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+            >
+              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              Print Application
+            </button>
+          </div>
         )}
       </div>
 
@@ -795,8 +834,112 @@ export function ApplicationDetailPanel({ id, onBack }: Props) {
             </div>
           )}
 
+          {/* ── Rollback (permission-gated) ── */}
+          {canRollback && (
+            <div className="rounded-2xl border border-orange-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-orange-100 px-6 py-4">
+                <RotateCcw className="h-4 w-4 text-orange-500" />
+                <h3 className="text-sm font-semibold text-slate-800">Roll Back Status</h3>
+              </div>
+              <div className="p-6">
+                <p className="mb-4 text-xs text-slate-500">
+                  Move this application back one stage — use this to correct a wrongly-processed
+                  application. It will revert from{' '}
+                  <span className="font-semibold text-slate-700">{STATUS_LABELS[app.status] || app.status}</span>{' '}
+                  to{' '}
+                  <span className="font-semibold text-orange-700">{STATUS_LABELS[rollbackTarget!] || rollbackTarget}</span>{' '}
+                  and reopen that stage for review.
+                </p>
+                <button
+                  onClick={() => { setShowRollback(true); setError(''); setRollbackRemark(''); setRollbackPassword(''); }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-white px-5 py-3 text-sm font-bold text-orange-600 transition hover:bg-orange-50"
+                >
+                  <RotateCcw className="h-4 w-4" /> Roll Back to {STATUS_LABELS[rollbackTarget!] || rollbackTarget}
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
+
+      {/* ── Rollback confirmation popup ── */}
+      <Modal
+        open={showRollback}
+        onClose={() => { if (!rollingBack) { setShowRollback(false); setError(''); setRollbackRemark(''); setRollbackPassword(''); } }}
+        title="Confirm Rollback"
+        footer={
+          <>
+            <button
+              onClick={() => { setShowRollback(false); setError(''); setRollbackRemark(''); setRollbackPassword(''); }}
+              disabled={rollingBack}
+              className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={doRollback}
+              disabled={rollingBack || !rollbackPassword}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700 disabled:opacity-50"
+            >
+              {rollingBack ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              Confirm Rollback
+            </button>
+          </>
+        }
+      >
+        {app && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+              <p className="text-sm text-orange-800">
+                This will revert the application from{' '}
+                <span className="font-semibold">{STATUS_LABELS[app.status] || app.status}</span>{' '}
+                to{' '}
+                <span className="font-semibold">{STATUS_LABELS[rollbackTarget!] || rollbackTarget}</span>{' '}
+                and reopen that stage. This action is recorded in the remarks.
+              </p>
+            </div>
+
+            {error && (
+              <div className="flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                Reason for rollback <span className="font-normal text-slate-400">(optional, recorded in remarks)</span>
+              </label>
+              <textarea
+                value={rollbackRemark}
+                onChange={(e) => setRollbackRemark(e.target.value)}
+                rows={3}
+                placeholder="Explain why this application is being rolled back…"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                Confirm your password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                value={rollbackPassword}
+                onChange={(e) => setRollbackPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && rollbackPassword && !rollingBack) doRollback(); }}
+                autoComplete="current-password"
+                placeholder="Your own account password"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+              />
+              <p className="mt-1.5 text-xs text-slate-400">
+                Enter the password of the account you are currently logged in as.
+              </p>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

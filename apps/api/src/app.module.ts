@@ -6,6 +6,7 @@ import { StudentsModule } from './students/students.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { DocumentsModule } from './documents/documents.module';
 import { AdminModule } from './admin/admin.module';
+import { LogsModule } from './logs/logs.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AdminModule } from './admin/admin.module';
       envFilePath: '../../.env.local',
     }),
     PrismaModule,
+    LogsModule,
     AuthModule,
     StudentsModule,
     ApplicationsModule,

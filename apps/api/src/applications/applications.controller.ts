@@ -15,7 +15,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '@/auth/guards/permissions.guard';
 import { RequirePermission } from '@/auth/decorators/require-permission.decorator';
 import { ApplicationsService } from './applications.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto } from './dtos/application.dto';
 
 @ApiTags('Applications')
 @Controller('applications')
@@ -115,5 +115,14 @@ export class ApplicationsController {
   @ApiOperation({ summary: 'Finance: approve or reject payment (staff)' })
   paymentReview(@Req() req: any, @Param('id') id: string, @Body() dto: PaymentReviewDto) {
     return this.applicationsService.financeReview(req.user.id, id, dto);
+  }
+
+  // Roll an application back one stage (correct a wrongly-processed application).
+  @Patch(':id/rollback')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('rollback', 'FULL')
+  @ApiOperation({ summary: 'Roll an application back to its previous status (staff)' })
+  rollback(@Req() req: any, @Param('id') id: string, @Body() dto: RollbackDto) {
+    return this.applicationsService.rollback(req.user.id, id, dto);
   }
 }

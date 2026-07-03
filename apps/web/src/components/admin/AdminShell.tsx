@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard, FileText, Wallet, BarChart3, CalendarDays,
   LogOut, Crown, Menu, X, Users, GraduationCap, BookOpen,
-  Layers, UserSquare2, UserCog, ChevronDown, Settings, Database,
+  Layers, UserSquare2, UserCog, ChevronDown, Settings, Database, ScrollText,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
@@ -23,11 +23,12 @@ import { ApplicationDetailPanel } from '@/components/staff/panels/ApplicationDet
 import { StudentsPanel }       from './panels/StudentsPanel';
 import { StudentManagePanel }  from './panels/StudentManagePanel';
 import { ReportsPanel }        from './panels/ReportsPanel';
+import { LogsPanel }           from './panels/LogsPanel';
 import { ThemeToggle }         from '@/components/ThemeToggle';
 
 type View =
   | 'dashboard' | 'applications' | 'app-detail' | 'payments' | 'reports'
-  | 'users' | 'students-import' | 'students' | 'programmes' | 'subjects' | 'batches' | 'schedules';
+  | 'users' | 'students-import' | 'students' | 'programmes' | 'subjects' | 'batches' | 'schedules' | 'logs';
 
 interface TopNavItem { view: View; label: string; icon: React.ComponentType<{ className?: string }>; resource?: string; }
 interface AdminNavItem { view: View; label: string; icon: React.ComponentType<{ className?: string }>; }
@@ -50,6 +51,7 @@ const MASTER_NAV: TopNavItem[] = [
 const ADMIN_NAV: AdminNavItem[] = [
   { view: 'users',    label: 'Staff & Permissions', icon: Users },
   { view: 'students', label: 'Student Manage',      icon: UserCog },
+  { view: 'logs',     label: 'Activity Logs',       icon: ScrollText },
 ];
 
 function ComingSoon({ label }: { label: string }) {
@@ -67,6 +69,7 @@ export function AdminShell() {
   const { isAdmin, permissions, name } = useMyPermissions();
   const [view, setView] = useState<View>('dashboard');
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [logsSerial, setLogsSerial] = useState<string | undefined>(undefined);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
   const [masterExpanded, setMasterExpanded] = useState(false);
@@ -78,9 +81,20 @@ export function AdminShell() {
     const nextView = v as View;
     setView(nextView);
     if (id) setSelectedAppId(id);
+    // Opening Logs from the menu (no serial) clears any per-application filter.
+    if (nextView === 'logs') setLogsSerial(undefined);
     setMobileOpen(false);
     if (ADMIN_VIEWS.has(nextView)) setAdminExpanded(true);
     if (MASTER_VIEWS.has(nextView)) setMasterExpanded(true);
+    window.scrollTo({ top: 0 });
+  };
+
+  // Deep link: open the Logs view pre-filtered to one application's serial number.
+  const openLogsForSerial = (serial: string) => {
+    setLogsSerial(serial);
+    setView('logs');
+    setAdminExpanded(true);
+    setMobileOpen(false);
     window.scrollTo({ top: 0 });
   };
 
@@ -256,7 +270,7 @@ export function AdminShell() {
           <main className="w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             {view === 'dashboard'      && <AdminDashboardPanel onNavigate={navigate} />}
             {view === 'applications'   && <ApplicationsPanel onNavigate={navigate} />}
-            {view === 'app-detail'     && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} />}
+            {view === 'app-detail'     && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} onViewLogs={isAdmin ? openLogsForSerial : undefined} />}
             {view === 'payments'       && <ComingSoon label="Payments" />}
             {view === 'reports'        && <ReportsPanel />}
             {view === 'users'          && <UsersPanel />}
@@ -266,6 +280,7 @@ export function AdminShell() {
             {view === 'subjects'       && <SubjectsPanel />}
             {view === 'batches'        && <BatchesPanel />}
             {view === 'schedules'      && <ExamSchedulesPanel />}
+            {view === 'logs'           && <LogsPanel key={logsSerial || 'all'} serial={logsSerial} />}
           </main>
         </div>
       </div>
