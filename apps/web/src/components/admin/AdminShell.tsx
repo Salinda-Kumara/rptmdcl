@@ -17,6 +17,8 @@ import { ProgrammesPanel }    from './panels/ProgrammesPanel';
 import { SubjectsPanel }      from './panels/SubjectsPanel';
 import { BatchesPanel }       from './panels/BatchesPanel';
 import { ExamSchedulesPanel } from './panels/ExamSchedulesPanel';
+import { ScheduleDetailPanel } from './panels/ScheduleDetailPanel';
+import { ExamStaffPanel }     from './panels/ExamStaffPanel';
 import { ApplicationsPanel }  from '@/components/staff/panels/ApplicationsPanel';
 import { ApplicationDetailPanel } from '@/components/staff/panels/ApplicationDetailPanel';
 
@@ -28,7 +30,7 @@ import { ThemeToggle }         from '@/components/ThemeToggle';
 
 type View =
   | 'dashboard' | 'applications' | 'app-detail' | 'payments' | 'reports'
-  | 'users' | 'students-import' | 'students' | 'programmes' | 'subjects' | 'batches' | 'schedules' | 'logs';
+  | 'users' | 'students-import' | 'students' | 'programmes' | 'subjects' | 'batches' | 'schedules' | 'schedule-detail' | 'exam-staff' | 'logs';
 
 interface TopNavItem { view: View; label: string; icon: React.ComponentType<{ className?: string }>; resource?: string; }
 interface AdminNavItem { view: View; label: string; icon: React.ComponentType<{ className?: string }>; }
@@ -39,6 +41,7 @@ const TOP_NAV: TopNavItem[] = [
   { view: 'payments',         label: 'Payments',        icon: Wallet,        resource: 'payments' },
   { view: 'students-import',  label: 'Students',        icon: UserSquare2,   resource: 'students' },
   { view: 'schedules',        label: 'Exam Schedules',  icon: CalendarDays,  resource: 'schedules' },
+  { view: 'exam-staff',       label: 'Exam Staff',      icon: Users,         resource: 'schedules' },
   { view: 'reports',          label: 'Reports',         icon: BarChart3,     resource: 'reports' },
 ];
 
@@ -69,6 +72,7 @@ export function AdminShell() {
   const { isAdmin, permissions, name } = useMyPermissions();
   const [view, setView] = useState<View>('dashboard');
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [logsSerial, setLogsSerial] = useState<string | undefined>(undefined);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
@@ -101,7 +105,9 @@ export function AdminShell() {
   const displayName = name || user?.name || user?.email || 'Admin';
   const initials = displayName.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
 
-  const activeView = view === 'app-detail' ? 'applications' : view;
+  const openSchedule = (id: string) => { setSelectedScheduleId(id); setView('schedule-detail'); window.scrollTo({ top: 0 }); };
+
+  const activeView = view === 'app-detail' ? 'applications' : view === 'schedule-detail' ? 'schedules' : view;
   const isAdminSection = ADMIN_VIEWS.has(view);
   const isMasterSection = MASTER_VIEWS.has(view);
 
@@ -279,7 +285,9 @@ export function AdminShell() {
             {view === 'programmes'     && <ProgrammesPanel />}
             {view === 'subjects'       && <SubjectsPanel />}
             {view === 'batches'        && <BatchesPanel />}
-            {view === 'schedules'      && <ExamSchedulesPanel />}
+            {view === 'schedules'      && <ExamSchedulesPanel onOpen={openSchedule} />}
+            {view === 'schedule-detail' && selectedScheduleId && <ScheduleDetailPanel scheduleId={selectedScheduleId} onBack={() => navigate('schedules')} />}
+            {view === 'exam-staff'     && <ExamStaffPanel />}
             {view === 'logs'           && <LogsPanel key={logsSerial || 'all'} serial={logsSerial} />}
           </main>
         </div>

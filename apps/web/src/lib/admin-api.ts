@@ -61,9 +61,49 @@ export interface AdminSchedule {
   name: string;
   startDate: string;
   endDate: string;
-  programmeId: string;
+  programmeId?: string | null;
   description?: string;
+  published?: boolean;
+  publicToken?: string | null;
+  publishedAt?: string | null;
 }
+
+export type ExamStaffRole = 'EXAMINER' | 'SUPERVISOR' | 'INVIGILATOR' | 'SUPPORTING' | 'OTHER';
+
+export interface AdminExamStaff {
+  id: string;
+  name: string;
+  role: ExamStaffRole;
+  phone?: string | null;
+  email?: string | null;
+  note?: string | null;
+  active: boolean;
+}
+
+export interface AdminScheduledExam {
+  id: string;
+  scheduleId: string;
+  orderIndex: number;
+  serialCode?: string | null;
+  startAtLabel?: string | null;
+  examDate?: string | null;
+  weekday?: string | null;
+  revisedDate?: string | null;
+  intake?: string | null;
+  courseCode?: string | null;
+  courseName?: string | null;
+  expectedCount?: number | null;
+  session1?: string | null;
+  session2?: string | null;
+  session3?: string | null;
+  location?: string | null;
+  chiefExaminerIds: string[];
+  supervisorIds: string[];
+  invigilatorIds: string[];
+  supportingIds: string[];
+}
+
+export type ScheduledExamInput = Partial<Omit<AdminScheduledExam, 'id' | 'scheduleId'>>;
 
 export interface AdminStudent {
   id: string;
@@ -140,11 +180,42 @@ export const adminApi = {
 
   // Exam schedules
   listSchedules: () => apiClient.get<AdminSchedule[]>('/admin/exam-schedules').then((r) => r.data),
-  createSchedule: (data: { name: string; startDate: string; endDate: string; programmeId: string; description?: string }) =>
+  createSchedule: (data: { name: string; startDate: string; endDate: string; programmeId?: string; description?: string }) =>
     apiClient.post<AdminSchedule>('/admin/exam-schedules', data).then((r) => r.data),
   updateSchedule: (id: string, data: Partial<{ name: string; startDate: string; endDate: string; programmeId: string; description: string }>) =>
     apiClient.patch<AdminSchedule>(`/admin/exam-schedules/${id}`, data).then((r) => r.data),
   deleteSchedule: (id: string) => apiClient.delete(`/admin/exam-schedules/${id}`).then((r) => r.data),
+  publishSchedule: (id: string) => apiClient.patch<AdminSchedule>(`/admin/exam-schedules/${id}/publish`).then((r) => r.data),
+  unpublishSchedule: (id: string) => apiClient.patch<AdminSchedule>(`/admin/exam-schedules/${id}/unpublish`).then((r) => r.data),
+
+  // Scheduled exams (timetable rows)
+  listScheduledExams: (scheduleId: string) =>
+    apiClient.get<AdminScheduledExam[]>(`/admin/exam-schedules/${scheduleId}/exams`).then((r) => r.data),
+  createScheduledExam: (scheduleId: string, data: ScheduledExamInput) =>
+    apiClient.post<AdminScheduledExam>(`/admin/exam-schedules/${scheduleId}/exams`, data).then((r) => r.data),
+  updateScheduledExam: (id: string, data: ScheduledExamInput) =>
+    apiClient.patch<AdminScheduledExam>(`/admin/scheduled-exams/${id}`, data).then((r) => r.data),
+  deleteScheduledExam: (id: string) => apiClient.delete(`/admin/scheduled-exams/${id}`).then((r) => r.data),
+  importScheduledExams: (scheduleId: string, file: File, replace = false) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient
+      .post<{ created: number; staffCreated: number; total: number }>(
+        `/admin/exam-schedules/${scheduleId}/import`,
+        fd,
+        { params: { replace } },
+      )
+      .then((r) => r.data);
+  },
+
+  // Exam staff directory
+  listExamStaff: (role?: string) =>
+    apiClient.get<AdminExamStaff[]>('/admin/exam-staff', { params: role ? { role } : {} }).then((r) => r.data),
+  createExamStaff: (data: { name: string; role: ExamStaffRole; phone?: string; email?: string; note?: string; active?: boolean }) =>
+    apiClient.post<AdminExamStaff>('/admin/exam-staff', data).then((r) => r.data),
+  updateExamStaff: (id: string, data: Partial<{ name: string; role: ExamStaffRole; phone: string; email: string; note: string; active: boolean }>) =>
+    apiClient.patch<AdminExamStaff>(`/admin/exam-staff/${id}`, data).then((r) => r.data),
+  deleteExamStaff: (id: string) => apiClient.delete(`/admin/exam-staff/${id}`).then((r) => r.data),
 
   // Students
   listStudents: (params: { search?: string; take?: number; skip?: number; batchNumber?: string; intake?: string }) =>

@@ -211,9 +211,9 @@ export class CreateExamScheduleDto {
   @IsDateString()
   endDate: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  programmeId: string;
+  programmeId?: string; // optional — a schedule can span programmes
 
   @IsOptional()
   @IsString()
@@ -241,3 +241,143 @@ export class UpdateExamScheduleDto {
   @IsString()
   description?: string;
 }
+
+/* ──────────────── Exam Staff (duty directory) ──────────────── */
+export enum ExamStaffRole {
+  EXAMINER = 'EXAMINER',
+  SUPERVISOR = 'SUPERVISOR',
+  INVIGILATOR = 'INVIGILATOR',
+  SUPPORTING = 'SUPPORTING',
+  OTHER = 'OTHER',
+}
+
+export class CreateExamStaffDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsEnum(ExamStaffRole)
+  role: ExamStaffRole;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class UpdateExamStaffDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsEnum(ExamStaffRole)
+  role?: ExamStaffRole;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+/* ──────────────── Scheduled Exam (timetable row) ──────────────── */
+export class CreateScheduledExamDto {
+  @IsOptional()
+  @IsString()
+  serialCode?: string;
+
+  @IsOptional()
+  @IsString()
+  startAtLabel?: string;
+
+  @IsOptional()
+  @IsDateString()
+  examDate?: string;
+
+  @IsOptional()
+  @IsString()
+  weekday?: string;
+
+  @IsOptional()
+  @IsDateString()
+  revisedDate?: string;
+
+  @IsOptional()
+  @IsString()
+  intake?: string;
+
+  @IsOptional()
+  @IsString()
+  courseCode?: string;
+
+  @IsOptional()
+  @IsString()
+  courseName?: string;
+
+  @IsOptional()
+  expectedCount?: number;
+
+  @IsOptional()
+  @IsString()
+  session1?: string;
+
+  @IsOptional()
+  @IsString()
+  session2?: string;
+
+  @IsOptional()
+  @IsString()
+  session3?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  chiefExaminerIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  supervisorIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  invigilatorIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  supportingIds?: string[];
+
+  @IsOptional()
+  orderIndex?: number;
+}
+
+// Same shape — all fields optional for a partial update.
+export class UpdateScheduledExamDto extends CreateScheduledExamDto {}

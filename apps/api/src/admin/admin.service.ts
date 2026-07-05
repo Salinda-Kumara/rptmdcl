@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
   CreateStaffUserDto,
@@ -17,6 +18,10 @@ import {
   UpdateBatchDto,
   CreateExamScheduleDto,
   UpdateExamScheduleDto,
+  CreateExamStaffDto,
+  UpdateExamStaffDto,
+  CreateScheduledExamDto,
+  UpdateScheduledExamDto,
   CreateStudentDto,
   UpdateStudentDto,
 } from './dtos/admin.dto';
@@ -27,6 +32,7 @@ import {
   programmeCodeOf,
   PROGRAMME_NAMES,
 } from './student-import.util';
+import { parseExamScheduleWorkbook } from './exam-schedule-import.util';
 
 @Injectable()
 export class AdminService {
@@ -314,7 +320,7 @@ export class AdminService {
   }
 
   async createExamSchedule(dto: CreateExamScheduleDto) {
-    await this.ensureProgramme(dto.programmeId);
+    if (dto.programmeId) await this.ensureProgramme(dto.programmeId);
     if (new Date(dto.endDate) < new Date(dto.startDate)) {
       throw new BadRequestException('End date cannot be before start date');
     }
@@ -323,7 +329,7 @@ export class AdminService {
         name: dto.name,
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
-        programmeId: dto.programmeId,
+        programmeId: dto.programmeId ?? null,
         description: dto.description,
       },
     });
@@ -348,6 +354,204 @@ export class AdminService {
     const s = await this.prisma.examinationSchedule.findFirst({ where: { id, deletedAt: null } });
     if (!s) throw new NotFoundException('Schedule not found');
     await this.prisma.examinationSchedule.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { success: true };
+  }
+
+  // Publish → generate (once) a stable public token and expose the view-only page.
+  async publishSchedule(id: string) {
+    const s = await this.prisma.examinationSchedule.findFirst({ where: { id, deletedAt: null } });
+    if (!s) throw new NotFoundException('Schedule not found');
+    const publicToken = s.publicToken ?? randomBytes(9).toString('base64url');
+    return this.prisma.examinationSchedule.update({
+      where: { id },
+      data: { published: true, publishedAt: new Date(), publicToken },
+    });
+  }
+
+  async unpublishSchedule(id: string) {
+    const s = await this.prisma.examinationSchedule.findFirst({ where: { id, deletedAt: null } });
+    if (!s) throw new NotFoundException('Schedule not found');
+    return this.prisma.examinationSchedule.update({ where: { id }, data: { published: false } });
+  }
+
+  /* ════════════════ Scheduled Exams (timetable rows) ════════════════ */
+  async listScheduledExams(scheduleId: string) {
+    const s = await this.prisma.examinationSchedule.findFirst({ where: { id: scheduleId, deletedAt: null } });
+    if (!s) throw new NotFoundException('Schedule not found');
+    return this.prisma.scheduledExam.findMany({
+      where: { scheduleId },
+      orderBy: [{ examDate: 'asc' }, { orderIndex: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  private scheduledExamData(dto: CreateScheduledExamDto) {
+    return {
+      serialCode: dto.serialCode,
+      startAtLabel: dto.startAtLabel,
+      examDate: dto.examDate ? new Date(dto.examDate) : null,
+      weekday: dto.weekday,
+      revisedDate: dto.revisedDate ? new Date(dto.revisedDate) : null,
+      intake: dto.intake,
+      courseCode: dto.courseCode,
+      courseName: dto.courseName,
+      expectedCount: dto.expectedCount != null ? Number(dto.expectedCount) : null,
+      session1: dto.session1,
+      session2: dto.session2,
+      session3: dto.session3,
+      location: dto.location,
+      chiefExaminerIds: dto.chiefExaminerIds ?? [],
+      supervisorIds: dto.supervisorIds ?? [],
+      invigilatorIds: dto.invigilatorIds ?? [],
+      supportingIds: dto.supportingIds ?? [],
+      orderIndex: dto.orderIndex != null ? Number(dto.orderIndex) : 0,
+    };
+  }
+
+  async createScheduledExam(scheduleId: string, dto: CreateScheduledExamDto) {
+    const s = await this.prisma.examinationSchedule.findFirst({ where: { id: scheduleId, deletedAt: null } });
+    if (!s) throw new NotFoundException('Schedule not found');
+    return this.prisma.scheduledExam.create({
+      data: { scheduleId, ...this.scheduledExamData(dto) },
+    });
+  }
+
+  async updateScheduledExam(id: string, dto: UpdateScheduledExamDto) {
+    const e = await this.prisma.scheduledExam.findUnique({ where: { id } });
+    if (!e) throw new NotFoundException('Exam not found');
+    // Only overwrite fields that were provided.
+    const data: any = {};
+    const src = this.scheduledExamData(dto);
+    for (const key of Object.keys(dto)) {
+      if (key in src) data[key] = (src as any)[key];
+    }
+    return this.prisma.scheduledExam.update({ where: { id }, data });
+  }
+
+  async deleteScheduledExam(id: string) {
+    const e = await this.prisma.scheduledExam.findUnique({ where: { id } });
+    if (!e) throw new NotFoundException('Exam not found');
+    await this.prisma.scheduledExam.delete({ where: { id } });
+    return { success: true };
+  }
+
+  // Bulk-import a timetable from an ESE-format Excel file. Staff named in the
+  // sheet are matched to the directory by (role, name) and created if missing.
+  async importScheduledExams(scheduleId: string, buffer?: Buffer, replace = false) {
+    if (!buffer) throw new BadRequestException('No file uploaded');
+    const schedule = await this.prisma.examinationSchedule.findFirst({ where: { id: scheduleId, deletedAt: null } });
+    if (!schedule) throw new NotFoundException('Schedule not found');
+
+    const { rows } = parseExamScheduleWorkbook(buffer);
+    if (rows.length === 0) throw new BadRequestException('No exam rows found in the file');
+
+    // Cache of directory staff keyed by role + lower-cased name.
+    const existing = await this.prisma.examStaff.findMany({ where: { deletedAt: null } });
+    const key = (role: string, name: string) => `${role}::${name.trim().toLowerCase()}`;
+    const staffMap = new Map(existing.map((s) => [key(s.role, s.name), s.id]));
+    let staffCreated = 0;
+
+    const resolve = async (role: string, names: string[]): Promise<string[]> => {
+      const ids: string[] = [];
+      for (const n of names) {
+        const k = key(role, n);
+        let id = staffMap.get(k);
+        if (!id) {
+          const created = await this.prisma.examStaff.create({ data: { name: n, role } });
+          id = created.id;
+          staffMap.set(k, id);
+          staffCreated += 1;
+        }
+        ids.push(id);
+      }
+      return ids;
+    };
+
+    if (replace) {
+      await this.prisma.scheduledExam.deleteMany({ where: { scheduleId } });
+    }
+
+    let order = 0;
+    let created = 0;
+    for (const r of rows) {
+      const [chiefExaminerIds, supervisorIds, invigilatorIds, supportingIds] = await Promise.all([
+        resolve('EXAMINER', r.chiefExaminers),
+        resolve('SUPERVISOR', r.supervisors),
+        resolve('INVIGILATOR', r.invigilators),
+        resolve('SUPPORTING', r.supporting),
+      ]);
+      const weekday =
+        r.weekday ||
+        (r.examDate ? r.examDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }) : undefined);
+      await this.prisma.scheduledExam.create({
+        data: {
+          scheduleId,
+          orderIndex: order++,
+          serialCode: r.serialCode,
+          startAtLabel: r.startAtLabel,
+          examDate: r.examDate ?? undefined,
+          weekday,
+          revisedDate: r.revisedDate ?? undefined,
+          intake: r.intake,
+          courseCode: r.courseCode,
+          courseName: r.courseName,
+          expectedCount: r.expectedCount ?? undefined,
+          session1: r.session1,
+          session2: r.session2,
+          session3: r.session3,
+          location: r.location,
+          chiefExaminerIds,
+          supervisorIds,
+          invigilatorIds,
+          supportingIds,
+        },
+      });
+      created += 1;
+    }
+
+    return { created, staffCreated, total: rows.length };
+  }
+
+  /* ════════════════ Exam Staff directory ════════════════ */
+  listExamStaff(role?: string) {
+    return this.prisma.examStaff.findMany({
+      where: { deletedAt: null, ...(role ? { role } : {}) },
+      orderBy: [{ role: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  createExamStaff(dto: CreateExamStaffDto) {
+    return this.prisma.examStaff.create({
+      data: {
+        name: dto.name,
+        role: dto.role,
+        phone: dto.phone,
+        email: dto.email,
+        note: dto.note,
+        active: dto.active ?? true,
+      },
+    });
+  }
+
+  async updateExamStaff(id: string, dto: UpdateExamStaffDto) {
+    const s = await this.prisma.examStaff.findFirst({ where: { id, deletedAt: null } });
+    if (!s) throw new NotFoundException('Staff not found');
+    return this.prisma.examStaff.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.role !== undefined ? { role: dto.role } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.email !== undefined ? { email: dto.email } : {}),
+        ...(dto.note !== undefined ? { note: dto.note } : {}),
+        ...(dto.active !== undefined ? { active: dto.active } : {}),
+      },
+    });
+  }
+
+  async deleteExamStaff(id: string) {
+    const s = await this.prisma.examStaff.findFirst({ where: { id, deletedAt: null } });
+    if (!s) throw new NotFoundException('Staff not found');
+    await this.prisma.examStaff.update({ where: { id }, data: { deletedAt: new Date() } });
     return { success: true };
   }
 

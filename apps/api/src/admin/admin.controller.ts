@@ -28,6 +28,10 @@ import {
   UpdateBatchDto,
   CreateExamScheduleDto,
   UpdateExamScheduleDto,
+  CreateExamStaffDto,
+  UpdateExamStaffDto,
+  CreateScheduledExamDto,
+  UpdateScheduledExamDto,
   CreateStudentDto,
   UpdateStudentDto,
 } from './dtos/admin.dto';
@@ -185,6 +189,83 @@ export class AdminController {
   @RequirePermission('schedules', 'FULL')
   deleteExamSchedule(@Param('id') id: string) {
     return this.adminService.deleteExamSchedule(id);
+  }
+
+  @Patch('exam-schedules/:id/publish')
+  @RequirePermission('schedules', 'FULL')
+  @ApiOperation({ summary: 'Publish a schedule to a public view-only link (admin)' })
+  publishSchedule(@Param('id') id: string) {
+    return this.adminService.publishSchedule(id);
+  }
+
+  @Patch('exam-schedules/:id/unpublish')
+  @RequirePermission('schedules', 'FULL')
+  @ApiOperation({ summary: 'Unpublish a schedule (admin)' })
+  unpublishSchedule(@Param('id') id: string) {
+    return this.adminService.unpublishSchedule(id);
+  }
+
+  /* ── Scheduled exams (timetable rows within a schedule) ── */
+  @Get('exam-schedules/:id/exams')
+  @RequirePermission('schedules', 'VIEW')
+  listScheduledExams(@Param('id') id: string) {
+    return this.adminService.listScheduledExams(id);
+  }
+
+  @Post('exam-schedules/:id/exams')
+  @RequirePermission('schedules', 'FULL')
+  createScheduledExam(@Param('id') id: string, @Body() dto: CreateScheduledExamDto) {
+    return this.adminService.createScheduledExam(id, dto);
+  }
+
+  @Patch('scheduled-exams/:id')
+  @RequirePermission('schedules', 'FULL')
+  updateScheduledExam(@Param('id') id: string, @Body() dto: UpdateScheduledExamDto) {
+    return this.adminService.updateScheduledExam(id, dto);
+  }
+
+  @Delete('scheduled-exams/:id')
+  @RequirePermission('schedules', 'FULL')
+  deleteScheduledExam(@Param('id') id: string) {
+    return this.adminService.deleteScheduledExam(id);
+  }
+
+  @Post('exam-schedules/:id/import')
+  @RequirePermission('schedules', 'FULL')
+  @ApiOperation({ summary: 'Bulk import timetable rows from an Excel file (admin)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
+  importScheduledExams(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('replace') replace?: string,
+  ) {
+    return this.adminService.importScheduledExams(id, file?.buffer, replace === 'true');
+  }
+
+  /* ── Exam staff directory ── */
+  @Get('exam-staff')
+  @RequirePermission('schedules', 'VIEW')
+  listExamStaff(@Query('role') role?: string) {
+    return this.adminService.listExamStaff(role);
+  }
+
+  @Post('exam-staff')
+  @RequirePermission('schedules', 'FULL')
+  createExamStaff(@Body() dto: CreateExamStaffDto) {
+    return this.adminService.createExamStaff(dto);
+  }
+
+  @Patch('exam-staff/:id')
+  @RequirePermission('schedules', 'FULL')
+  updateExamStaff(@Param('id') id: string, @Body() dto: UpdateExamStaffDto) {
+    return this.adminService.updateExamStaff(id, dto);
+  }
+
+  @Delete('exam-staff/:id')
+  @RequirePermission('schedules', 'FULL')
+  deleteExamStaff(@Param('id') id: string) {
+    return this.adminService.deleteExamStaff(id);
   }
 
   /* ── Students ── */

@@ -324,12 +324,68 @@ model ExaminationSchedule {
   name         String
   startDate    DateTime
   endDate      DateTime
-  programmeId  String
+  programmeId  String?  // Optional — a schedule can hold exams across programmes
   description  String?
+  published    Boolean  @default(false) // when true, viewable on the public link
+  publicToken  String?  @unique          // stable slug for the public view-only page
+  publishedAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?
 
+  exams        ScheduledExam[]
+
   @@index([startDate])
   @@index([deletedAt])
+}
+
+// Directory of exam-duty staff, organised by role/category. People are added
+// here once, then picked when scheduling each exam.
+model ExamStaff {
+  id        String   @id @default(uuid())
+  name      String
+  role      String   // EXAMINER, SUPERVISOR, INVIGILATOR, SUPPORTING, OTHER
+  phone     String?
+  email     String?
+  note      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([role])
+  @@index([deletedAt])
+}
+
+// One exam paper / timetable row within an ExaminationSchedule. Mirrors the
+// columns of the printed ESE schedule. Staff fields hold ExamStaff ids (a slot
+// can have several people, e.g. multiple invigilators).
+model ScheduledExam {
+  id               String    @id @default(uuid())
+  scheduleId       String
+  orderIndex       Int       @default(0)
+  serialCode       String?   // e.g. 2026/165
+  startAtLabel     String?   // "Exams to be start at", e.g. "28. June"
+  examDate         DateTime? // ESE Date
+  weekday          String?   // ESE Date Weekday
+  revisedDate      DateTime?
+  intake           String?   // e.g. "3B WE/MOHE WE"
+  courseCode       String?   // e.g. BMBA1212
+  courseName       String?
+  expectedCount    Int?
+  session1         String?   // time-slot label, e.g. "9.00-11.30am"
+  session2         String?
+  session3         String?
+  location         String?
+  chiefExaminerIds String[]  @default([])
+  supervisorIds    String[]  @default([])
+  invigilatorIds   String[]  @default([])
+  supportingIds    String[]  @default([])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  schedule ExaminationSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([scheduleId])
+  @@index([examDate])
 }
