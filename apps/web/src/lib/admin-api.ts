@@ -66,6 +66,7 @@ export interface AdminSchedule {
   published?: boolean;
   publicToken?: string | null;
   publishedAt?: string | null;
+  applyEnabled?: boolean;
 }
 
 export type ExamStaffRole = 'EXAMINER' | 'SUPERVISOR' | 'INVIGILATOR' | 'SUPPORTING' | 'OTHER';
@@ -195,6 +196,8 @@ export const adminApi = {
   deleteSchedule: (id: string) => apiClient.delete(`/admin/exam-schedules/${id}`).then((r) => r.data),
   publishSchedule: (id: string) => apiClient.patch<AdminSchedule>(`/admin/exam-schedules/${id}/publish`).then((r) => r.data),
   unpublishSchedule: (id: string) => apiClient.patch<AdminSchedule>(`/admin/exam-schedules/${id}/unpublish`).then((r) => r.data),
+  setScheduleApplyEnabled: (id: string, enabled: boolean) =>
+    apiClient.patch<AdminSchedule>(`/admin/exam-schedules/${id}/apply-enabled`, { enabled }).then((r) => r.data),
 
   // Scheduled exams (timetable rows)
   listScheduledExams: (scheduleId: string) =>

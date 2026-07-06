@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  LayoutDashboard, FileText, Wallet, BarChart3, CalendarDays,
+  LayoutDashboard, FileText, BarChart3, CalendarDays,
   LogOut, Crown, Menu, X, Users, GraduationCap, BookOpen,
   Layers, UserSquare2, UserCog, ChevronDown, Settings, Database, ScrollText,
   PanelLeftClose, PanelLeftOpen, Boxes, MapPin,
@@ -31,7 +31,7 @@ import { LogsPanel }           from './panels/LogsPanel';
 import { ThemeToggle }         from '@/components/ThemeToggle';
 
 type View =
-  | 'dashboard' | 'applications' | 'app-detail' | 'payments' | 'reports'
+  | 'dashboard' | 'applications' | 'app-detail' | 'reports'
   | 'users' | 'students-import' | 'students' | 'programmes' | 'subjects' | 'batches' | 'schedules' | 'schedule-detail' | 'exam-staff' | 'exam-locations' | 'logs';
 
 interface TopNavItem { view: View; label: string; icon: React.ComponentType<{ className?: string }>; resource?: string; }
@@ -40,7 +40,6 @@ interface AdminNavItem { view: View; label: string; icon: React.ComponentType<{ 
 const TOP_NAV: TopNavItem[] = [
   { view: 'dashboard',        label: 'Dashboard',       icon: LayoutDashboard },
   { view: 'applications',     label: 'Applications',    icon: FileText,      resource: 'applications' },
-  { view: 'payments',         label: 'Payments',        icon: Wallet,        resource: 'payments' },
   { view: 'students-import',  label: 'Students',        icon: UserSquare2,   resource: 'students' },
   { view: 'schedules',        label: 'Exam Schedules',  icon: CalendarDays,  resource: 'schedules' },
   { view: 'reports',          label: 'Reports',         icon: BarChart3,     resource: 'reports' },
@@ -63,16 +62,6 @@ const ADMIN_NAV: AdminNavItem[] = [
   { view: 'students', label: 'Student Manage',      icon: UserCog },
   { view: 'logs',     label: 'Activity Logs',       icon: ScrollText },
 ];
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white py-24 text-center">
-      <p className="text-lg font-semibold text-slate-400">{label}</p>
-      <p className="mt-1 text-sm text-slate-300">Coming soon</p>
-    </div>
-  );
-}
-
 
 export function AdminShell() {
   const { user, logout } = useAuth();
@@ -108,13 +97,10 @@ export function AdminShell() {
     window.scrollTo({ top: 0 });
   };
 
-  // Deep link: open the Logs view pre-filtered to one application's serial number.
+  // Deep link: open the activity logs pre-filtered to one application's serial
+  // number in a NEW window, so the review stays open.
   const openLogsForSerial = (serial: string) => {
-    setLogsSerial(serial);
-    setView('logs');
-    setAdminExpanded(true);
-    setMobileOpen(false);
-    window.scrollTo({ top: 0 });
+    window.open(`/dashboard/admin/logs?serial=${encodeURIComponent(serial)}`, '_blank');
   };
 
   const displayName = name || user?.name || user?.email || 'Admin';
@@ -347,7 +333,6 @@ export function AdminShell() {
             {view === 'dashboard'      && <AdminDashboardPanel onNavigate={navigate} />}
             {view === 'applications'   && <ApplicationsPanel onNavigate={navigate} />}
             {view === 'app-detail'     && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} onViewLogs={isAdmin ? openLogsForSerial : undefined} />}
-            {view === 'payments'       && <ComingSoon label="Payments" />}
             {view === 'reports'        && <ReportsPanel />}
             {view === 'users'          && <UsersPanel />}
             {view === 'students-import' && <StudentsPanel onNavigate={navigate} />}

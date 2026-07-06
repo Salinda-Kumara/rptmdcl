@@ -62,4 +62,26 @@ export class StudentsService {
       orderBy: { startDate: 'asc' },
     });
   }
+
+  /**
+   * Timetable rows from schedules with "enable for apply" switched on — used to
+   * auto-fill the upcoming exam date + intake when a student picks a subject.
+   * Keyed by course code on the client.
+   */
+  async getScheduledExams(userId: string) {
+    const student = await this.prisma.student.findFirst({ where: { userId } });
+    if (!student) throw new NotFoundException('Student not found');
+
+    return this.prisma.scheduledExam.findMany({
+      where: { schedule: { applyEnabled: true, deletedAt: null } },
+      select: {
+        courseCode: true,
+        courseName: true,
+        intake: true,
+        examDate: true,
+        revisedDate: true,
+      },
+      orderBy: { examDate: 'asc' },
+    });
+  }
 }

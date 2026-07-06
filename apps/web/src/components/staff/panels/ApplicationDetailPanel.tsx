@@ -313,7 +313,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
         </button>
         {app && app.status !== 'DRAFT' && (
           <div className="flex items-center gap-2">
-            {onViewLogs && app.serialNumber && (
+            {isAdmin && onViewLogs && app.serialNumber && (
               <button
                 onClick={() => onViewLogs(app.serialNumber!)}
                 title="View this application's activity logs"

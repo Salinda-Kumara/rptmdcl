@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
-import { applicationsApi, studentsApi, Subject, ApplicantDetails, ExamSchedule } from '@/lib/applications-api';
+import { applicationsApi, studentsApi, Subject, ApplicantDetails, ScheduledExamInfo } from '@/lib/applications-api';
 
 type AppType = 'REPEAT' | 'MEDICAL';
 type Category = 'REPEAT' | 'MEDICAL' | '1ST_ATTEMPT';
@@ -107,7 +107,7 @@ export default function NewApplicationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [loadingSubjects, setLoadingSubjects] = useState(true);
-  const [examSchedules, setExamSchedules] = useState<ExamSchedule[]>([]);
+  const [scheduledExams, setScheduledExams] = useState<ScheduledExamInfo[]>([]);
   const [subjectSearch, setSubjectSearch] = useState('');
 
   // Personal details (pre-filled from the student record; corrections here are
@@ -122,7 +122,7 @@ export default function NewApplicationPage() {
       .catch(() => setError('Failed to load subjects'))
       .finally(() => setLoadingSubjects(false));
 
-    studentsApi.getExamSchedules().then(setExamSchedules).catch(() => {});
+    studentsApi.getScheduledExams().then(setScheduledExams).catch(() => {});
 
     studentsApi.getProfile()
       .then((p: any) => {
@@ -171,16 +171,27 @@ export default function NewApplicationPage() {
     gradeEarned: '',
   });
 
-  // When intake changes, auto-fill the exam date from the matching schedule.
-  const handleIntakeChange = (subjectId: string, intake: string) => {
-    updateField(subjectId, 'upcomingExamIntake', intake);
-    const match = examSchedules.find((s) =>
-      s.name.toLowerCase().includes(intake.toLowerCase()) ||
-      new Date(s.startDate).toISOString().slice(0, 7) === intake.slice(0, 7)
-    );
-    if (match) {
-      updateField(subjectId, 'upcomingExamDate', new Date(match.startDate).toISOString().slice(0, 10));
+  // Match a subject to a published timetable row by course code (spaces/case are
+  // ignored). When several rows share a code, prefer the one for the student's own
+  // intake; otherwise take the earliest.
+  const normCode = (c?: string | null) => (c ?? '').toUpperCase().replace(/\s+/g, '');
+  const scheduleForSubject = (subject: Subject): ScheduledExamInfo | null => {
+    const code = normCode(subject.code);
+    const matches = scheduledExams.filter((e) => normCode(e.courseCode) === code);
+    if (!matches.length) return null;
+    const myIntake = (applicant.intake || applicant.batchNumber || '').toLowerCase().trim();
+    if (myIntake) {
+      const token = myIntake.split(/[\/\s]/)[0]; // e.g. "3B" from "3B WE/MOHE WE"
+      const pref = matches.find((e) => (e.intake ?? '').toLowerCase().includes(token) && token.length > 1);
+      if (pref) return pref;
     }
+    return matches[0];
+  };
+
+  // Prefer the revised date, else the original exam date, as a yyyy-mm-dd string.
+  const scheduleDate = (e: ScheduledExamInfo): string => {
+    const d = e.revisedDate ?? e.examDate;
+    return d ? new Date(d).toISOString().slice(0, 10) : '';
   };
 
   // Changing the application type re-normalizes any already-selected subject
@@ -201,7 +212,16 @@ export default function NewApplicationPage() {
   const toggleSubject = (subjectId: string) => {
     setSelected((prev) => {
       const exists = prev.find((s) => s.subjectId === subjectId);
-      return exists ? prev.filter((s) => s.subjectId !== subjectId) : [...prev, emptySubject(subjectId)];
+      if (exists) return prev.filter((s) => s.subjectId !== subjectId);
+      // On select, auto-fill the upcoming exam intake + date from the schedule.
+      const base = emptySubject(subjectId);
+      const subject = subjects.find((s) => s.id === subjectId);
+      const sched = subject ? scheduleForSubject(subject) : null;
+      if (sched) {
+        base.upcomingExamIntake = sched.intake ?? '';
+        base.upcomingExamDate = scheduleDate(sched);
+      }
+      return [...prev, base];
     });
   };
 
@@ -294,28 +314,22 @@ export default function NewApplicationPage() {
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">Upcoming Exam Intake</label>
-        {examSchedules.length > 0 ? (
-          <select
-            value={sel.upcomingExamIntake}
-            onChange={(e) => handleIntakeChange(subject.id, e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">— Select intake —</option>
-            {examSchedules.map((s) => (
-              <option key={s.id} value={new Date(s.startDate).toISOString().slice(0, 7)}>
-                {s.name} ({new Date(s.startDate).toISOString().slice(0, 7)})
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type="text" placeholder="e.g. 2024-06"
-            value={sel.upcomingExamIntake}
-            onChange={(e) => handleIntakeChange(subject.id, e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          />
-        )}
+        <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+          Upcoming Exam Intake
+          {sel.upcomingExamIntake && (
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">Auto-filled</span>
+          )}
+        </label>
+        <input
+          type="text" placeholder="From exam schedule"
+          value={sel.upcomingExamIntake}
+          onChange={(e) => updateField(subject.id, 'upcomingExamIntake', e.target.value)}
+          className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+            sel.upcomingExamIntake
+              ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
+              : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
+          }`}
+        />
       </div>
       <div>
         <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">

@@ -207,6 +207,13 @@ export class AdminController {
     return this.adminService.unpublishSchedule(id);
   }
 
+  @Patch('exam-schedules/:id/apply-enabled')
+  @RequirePermission('schedules', 'FULL')
+  @ApiOperation({ summary: 'Enable/disable auto-fill of student applications from this schedule (admin)' })
+  setScheduleApplyEnabled(@Param('id') id: string, @Body('enabled') enabled: boolean) {
+    return this.adminService.setScheduleApplyEnabled(id, enabled === true);
+  }
+
   /* ── Scheduled exams (timetable rows within a schedule) ── */
   @Get('exam-schedules/:id/exams')
   @RequirePermission('schedules', 'VIEW')

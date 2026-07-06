@@ -376,6 +376,13 @@ export class AdminService {
     return this.prisma.examinationSchedule.update({ where: { id }, data: { published: false } });
   }
 
+  // Toggle whether student applications auto-fill subject exam data from this schedule.
+  async setScheduleApplyEnabled(id: string, enabled: boolean) {
+    const s = await this.prisma.examinationSchedule.findFirst({ where: { id, deletedAt: null } });
+    if (!s) throw new NotFoundException('Schedule not found');
+    return this.prisma.examinationSchedule.update({ where: { id }, data: { applyEnabled: enabled } });
+  }
+
   /* ════════════════ Scheduled Exams (timetable rows) ════════════════ */
   async listScheduledExams(scheduleId: string) {
     const s = await this.prisma.examinationSchedule.findFirst({ where: { id: scheduleId, deletedAt: null } });

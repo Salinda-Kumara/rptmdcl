@@ -27,4 +27,10 @@ export class StudentsController {
   getExamSchedules(@Req() req: any) {
     return this.studentsService.getExamSchedules(req.user.id);
   }
+
+  @Get('scheduled-exams')
+  @ApiOperation({ summary: 'Published timetable rows (course code → date/intake) for subject auto-fill' })
+  getScheduledExams(@Req() req: any) {
+    return this.studentsService.getScheduledExams(req.user.id);
+  }
 }

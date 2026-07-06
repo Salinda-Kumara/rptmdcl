@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import {
-  LayoutDashboard, FileText, Wallet, CalendarDays,
+  LayoutDashboard, FileText, CalendarDays,
   BarChart3, LogOut, ShieldCheck, Menu, X, Crown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
@@ -14,7 +14,7 @@ import { ApplicationDetailPanel } from './panels/ApplicationDetailPanel';
 import { ReportsPanel } from '@/components/admin/panels/ReportsPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-type View = 'dashboard' | 'applications' | 'app-detail' | 'payments' | 'schedules' | 'reports' | 'admin';
+type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'reports' | 'admin';
 
 interface NavItem {
   view: View;
@@ -27,7 +27,6 @@ interface NavItem {
 const NAV: NavItem[] = [
   { view: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
   { view: 'applications', label: 'Applications',  icon: FileText,      resource: 'applications' },
-  { view: 'payments',     label: 'Payments',      icon: Wallet,        resource: 'payments' },
   { view: 'schedules',    label: 'Schedules',     icon: CalendarDays,  resource: 'schedules' },
   { view: 'reports',      label: 'Reports',       icon: BarChart3,     resource: 'reports' },
   { view: 'admin',        label: 'Admin Console', icon: Crown,         adminOnly: true },
@@ -152,7 +151,6 @@ export function StaffShell() {
             {view === 'dashboard'    && <DashboardPanel onNavigate={navigate} />}
             {view === 'applications' && <ApplicationsPanel onNavigate={navigate} />}
             {view === 'app-detail'   && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} />}
-            {view === 'payments'     && <ComingSoon label="Payments" />}
             {view === 'schedules'    && <ComingSoon label="Schedules" />}
             {view === 'reports'      && <ReportsPanel />}
             {view === 'admin'        && <ComingSoon label="Admin Console" />}

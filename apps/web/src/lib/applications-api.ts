@@ -112,10 +112,21 @@ export interface ExamSchedule {
   description?: string;
 }
 
+// A published timetable row — used to auto-fill a subject's upcoming exam
+// date + intake from the exam schedule (matched by course code).
+export interface ScheduledExamInfo {
+  courseCode?: string | null;
+  courseName?: string | null;
+  intake?: string | null;
+  examDate?: string | null;
+  revisedDate?: string | null;
+}
+
 export const studentsApi = {
   getProfile: () => apiClient.get('/students/profile').then((r) => r.data),
   getSubjects: () => apiClient.get<Subject[]>('/students/subjects').then((r) => r.data),
   getExamSchedules: () => apiClient.get<ExamSchedule[]>('/students/exam-schedules').then((r) => r.data),
+  getScheduledExams: () => apiClient.get<ScheduledExamInfo[]>('/students/scheduled-exams').then((r) => r.data),
 };
 
 export const documentsApi = {

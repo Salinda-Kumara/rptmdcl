@@ -329,6 +329,7 @@ model ExaminationSchedule {
   published    Boolean  @default(false) // when true, viewable on the public link
   publicToken  String?  @unique          // stable slug for the public view-only page
   publishedAt  DateTime?
+  applyEnabled Boolean  @default(false) // when true, student applications auto-fill from this schedule
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?

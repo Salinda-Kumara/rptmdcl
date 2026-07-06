@@ -136,6 +136,18 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
     try { await navigator.clipboard.writeText(publicUrl); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ }
   };
 
+  // "Enable for apply" — student applications auto-fill exam date/intake from this schedule.
+  const [togglingApply, setTogglingApply] = useState(false);
+  const toggleApplyEnabled = async () => {
+    if (!schedule) return;
+    setTogglingApply(true);
+    try {
+      const updated = await adminApi.setScheduleApplyEnabled(scheduleId, !schedule.applyEnabled);
+      setSchedule((s) => (s ? { ...s, ...updated } : updated));
+    } catch (e: any) { setMsg(e.response?.data?.message?.toString() || 'Failed to update apply setting'); }
+    finally { setTogglingApply(false); }
+  };
+
   const load = () => {
     setLoading(true);
     Promise.all([adminApi.listSchedules(), adminApi.listScheduledExams(scheduleId), adminApi.listExamStaff()])
@@ -293,6 +305,32 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
               {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />} Publish
             </button>
           )}
+          {/* Enable for apply — students' applications auto-fill from this schedule */}
+          <button
+            type="button"
+            onClick={toggleApplyEnabled}
+            disabled={togglingApply || !schedule}
+            title="When enabled, students applying for repeat/medical get the upcoming exam date and intake auto-filled from this schedule"
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 ${
+              schedule?.applyEnabled
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <span
+              className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
+                schedule?.applyEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                  schedule?.applyEnabled ? 'translate-x-3.5' : 'translate-x-0.5'
+                }`}
+              />
+            </span>
+            {togglingApply ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Enable for apply
+          </button>
         </div>
       </div>
 
