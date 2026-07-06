@@ -381,3 +381,38 @@ export class CreateScheduledExamDto {
 
 // Same shape — all fields optional for a partial update.
 export class UpdateScheduledExamDto extends CreateScheduledExamDto {}
+
+/* ──────────────── Exam Locations (venue directory) ──────────────── */
+export class CreateExamLocationDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsOptional()
+  capacity?: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class UpdateExamLocationDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  capacity?: number;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}

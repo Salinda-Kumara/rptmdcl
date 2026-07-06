@@ -30,6 +30,8 @@ import {
   UpdateExamScheduleDto,
   CreateExamStaffDto,
   UpdateExamStaffDto,
+  CreateExamLocationDto,
+  UpdateExamLocationDto,
   CreateScheduledExamDto,
   UpdateScheduledExamDto,
   CreateStudentDto,
@@ -266,6 +268,31 @@ export class AdminController {
   @RequirePermission('schedules', 'FULL')
   deleteExamStaff(@Param('id') id: string) {
     return this.adminService.deleteExamStaff(id);
+  }
+
+  /* ── Exam location directory ── */
+  @Get('exam-locations')
+  @RequirePermission('schedules', 'VIEW')
+  listExamLocations() {
+    return this.adminService.listExamLocations();
+  }
+
+  @Post('exam-locations')
+  @RequirePermission('schedules', 'FULL')
+  createExamLocation(@Body() dto: CreateExamLocationDto) {
+    return this.adminService.createExamLocation(dto);
+  }
+
+  @Patch('exam-locations/:id')
+  @RequirePermission('schedules', 'FULL')
+  updateExamLocation(@Param('id') id: string, @Body() dto: UpdateExamLocationDto) {
+    return this.adminService.updateExamLocation(id, dto);
+  }
+
+  @Delete('exam-locations/:id')
+  @RequirePermission('schedules', 'FULL')
+  deleteExamLocation(@Param('id') id: string) {
+    return this.adminService.deleteExamLocation(id);
   }
 
   /* ── Students ── */

@@ -20,6 +20,8 @@ import {
   UpdateExamScheduleDto,
   CreateExamStaffDto,
   UpdateExamStaffDto,
+  CreateExamLocationDto,
+  UpdateExamLocationDto,
   CreateScheduledExamDto,
   UpdateScheduledExamDto,
   CreateStudentDto,
@@ -552,6 +554,46 @@ export class AdminService {
     const s = await this.prisma.examStaff.findFirst({ where: { id, deletedAt: null } });
     if (!s) throw new NotFoundException('Staff not found');
     await this.prisma.examStaff.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { success: true };
+  }
+
+  /* ════════════════ Exam Locations directory ════════════════ */
+  listExamLocations() {
+    return this.prisma.examLocation.findMany({
+      where: { deletedAt: null },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  createExamLocation(dto: CreateExamLocationDto) {
+    return this.prisma.examLocation.create({
+      data: {
+        name: dto.name,
+        capacity: dto.capacity != null ? Number(dto.capacity) : null,
+        note: dto.note,
+        active: dto.active ?? true,
+      },
+    });
+  }
+
+  async updateExamLocation(id: string, dto: UpdateExamLocationDto) {
+    const l = await this.prisma.examLocation.findFirst({ where: { id, deletedAt: null } });
+    if (!l) throw new NotFoundException('Location not found');
+    return this.prisma.examLocation.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.capacity !== undefined ? { capacity: dto.capacity != null ? Number(dto.capacity) : null } : {}),
+        ...(dto.note !== undefined ? { note: dto.note } : {}),
+        ...(dto.active !== undefined ? { active: dto.active } : {}),
+      },
+    });
+  }
+
+  async deleteExamLocation(id: string) {
+    const l = await this.prisma.examLocation.findFirst({ where: { id, deletedAt: null } });
+    if (!l) throw new NotFoundException('Location not found');
+    await this.prisma.examLocation.update({ where: { id }, data: { deletedAt: new Date() } });
     return { success: true };
   }
 

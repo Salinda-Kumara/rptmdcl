@@ -80,6 +80,14 @@ export interface AdminExamStaff {
   active: boolean;
 }
 
+export interface AdminExamLocation {
+  id: string;
+  name: string;
+  capacity?: number | null;
+  note?: string | null;
+  active: boolean;
+}
+
 export interface AdminScheduledExam {
   id: string;
   scheduleId: string;
@@ -216,6 +224,14 @@ export const adminApi = {
   updateExamStaff: (id: string, data: Partial<{ name: string; role: ExamStaffRole; phone: string; email: string; note: string; active: boolean }>) =>
     apiClient.patch<AdminExamStaff>(`/admin/exam-staff/${id}`, data).then((r) => r.data),
   deleteExamStaff: (id: string) => apiClient.delete(`/admin/exam-staff/${id}`).then((r) => r.data),
+
+  // Exam location directory
+  listExamLocations: () => apiClient.get<AdminExamLocation[]>('/admin/exam-locations').then((r) => r.data),
+  createExamLocation: (data: { name: string; capacity?: number; note?: string; active?: boolean }) =>
+    apiClient.post<AdminExamLocation>('/admin/exam-locations', data).then((r) => r.data),
+  updateExamLocation: (id: string, data: Partial<{ name: string; capacity: number; note: string; active: boolean }>) =>
+    apiClient.patch<AdminExamLocation>(`/admin/exam-locations/${id}`, data).then((r) => r.data),
+  deleteExamLocation: (id: string) => apiClient.delete(`/admin/exam-locations/${id}`).then((r) => r.data),
 
   // Students
   listStudents: (params: { search?: string; take?: number; skip?: number; batchNumber?: string; intake?: string }) =>

@@ -7,14 +7,42 @@ import {
 } from 'lucide-react';
 import {
   adminApi, AdminSchedule, AdminScheduledExam, AdminExamStaff, ExamStaffRole,
+  AdminSubject, AdminBatch, AdminExamLocation,
 } from '@/lib/admin-api';
 import { exportExamScheduleExcel } from '@/lib/export-exam-schedule';
 
 const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('en-LK', { dateStyle: 'medium' }) : '');
 const toInput = (d?: string | null) => (d ? new Date(d).toISOString().slice(0, 10) : '');
 const weekdayOf = (d?: string | null) => (d ? new Date(d).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }) : '');
+const longDate = (d?: string | null) =>
+  d ? new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : 'Unscheduled / no date';
 
 type StaffKey = 'chiefExaminerIds' | 'supervisorIds' | 'invigilatorIds' | 'supportingIds';
+
+// Timetable columns with default (resizable) widths in px.
+const GRID_COLS: { label: string; w: number; min?: number }[] = [
+  { label: '#', w: 44, min: 36 },
+  { label: 'Serial Code', w: 96 },
+  { label: 'Start At', w: 96 },
+  { label: 'ESE Date', w: 130 },
+  { label: 'Day', w: 74 },
+  { label: 'Revised', w: 130 },
+  { label: 'Intake', w: 120 },
+  { label: 'Course Code', w: 100 },
+  { label: 'Course', w: 210 },
+  { label: 'Count', w: 66 },
+  { label: 'Session 1', w: 106 },
+  { label: 'Session 2', w: 106 },
+  { label: 'Session 3', w: 106 },
+  { label: 'Location', w: 165 },
+  { label: 'Chief Examiner', w: 155 },
+  { label: 'Supervisor', w: 145 },
+  { label: 'Invigilator', w: 155 },
+  { label: 'Supporting', w: 135 },
+  { label: '', w: 52, min: 44 },
+];
+const DEFAULT_WIDTHS = GRID_COLS.map((c) => c.w);
+
 const STAFF_SLOTS: { key: StaffKey; role: ExamStaffRole; label: string }[] = [
   { key: 'chiefExaminerIds', role: 'EXAMINER',    label: 'Chief Examiner' },
   { key: 'supervisorIds',    role: 'SUPERVISOR',  label: 'Supervisor' },
@@ -28,6 +56,10 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
   const [schedule, setSchedule] = useState<AdminSchedule | null>(null);
   const [exams, setExams] = useState<AdminScheduledExam[]>([]);
   const [staff, setStaff] = useState<AdminExamStaff[]>([]);
+  const [subjects, setSubjects] = useState<AdminSubject[]>([]);
+  const [batches, setBatches] = useState<AdminBatch[]>([]);
+  const [locations, setLocations] = useState<AdminExamLocation[]>([]);
+  const [rowRev, setRowRev] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -37,6 +69,46 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
   const [publishing, setPublishing] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Resizable columns — widths persisted across sessions.
+  const [colWidths, setColWidths] = useState<number[]>(DEFAULT_WIDTHS);
+  const colRefs = useRef<(HTMLTableColElement | null)[]>([]);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const totalWidth = colWidths.reduce((a, b) => a + b, 0);
+
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem('scheduleColWidths');
+      if (s) { const arr = JSON.parse(s); if (Array.isArray(arr) && arr.length === DEFAULT_WIDTHS.length) setColWidths(arr); }
+    } catch { /* ignore */ }
+  }, []);
+
+  const startResize = (idx: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = colWidths[idx];
+    const others = totalWidth - startW;
+    let lastW = startW;
+    const onMove = (ev: MouseEvent) => {
+      lastW = Math.max(GRID_COLS[idx].min ?? 48, startW + (ev.clientX - startX));
+      if (colRefs.current[idx]) colRefs.current[idx]!.style.width = `${lastW}px`;
+      if (tableRef.current) tableRef.current.style.width = `${others + lastW}px`;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      setColWidths((prev) => {
+        const n = [...prev]; n[idx] = lastW;
+        try { localStorage.setItem('scheduleColWidths', JSON.stringify(n)); } catch { /* ignore */ }
+        return n;
+      });
+    };
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+  const resetWidths = () => { setColWidths(DEFAULT_WIDTHS); try { localStorage.removeItem('scheduleColWidths'); } catch { /* ignore */ } };
 
   const publicUrl = schedule?.publicToken && typeof window !== 'undefined'
     ? `${window.location.origin}/schedule/${schedule.publicToken}`
@@ -76,7 +148,32 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
   };
   useEffect(load, [scheduleId]); // eslint-disable-line
 
+  // Reference data for autocomplete (subjects, batches, locations) — loaded once.
+  useEffect(() => {
+    adminApi.listSubjects().then(setSubjects).catch(() => {});
+    adminApi.listBatches().then(setBatches).catch(() => {});
+    adminApi.listExamLocations().then(setLocations).catch(() => {});
+  }, []);
+
   const staffById = useMemo(() => new Map(staff.map((s) => [s.id, s])), [staff]);
+
+  const normCode = (c: string) => c.replace(/\s+/g, '').toLowerCase();
+  const subjectByCode = useMemo(() => new Map(subjects.map((s) => [normCode(s.code), s])), [subjects]);
+  // Distinct intakes: batch intakes + any already used in this schedule.
+  const intakeOptions = useMemo(() => {
+    const set = new Set<string>();
+    batches.forEach((b) => b.intake && set.add(b.intake));
+    exams.forEach((e) => e.intake && set.add(e.intake));
+    return [...set].sort();
+  }, [batches, exams]);
+  const locationOptions = useMemo(() => {
+    const set = new Set<string>();
+    locations.forEach((l) => set.add(l.name));
+    exams.forEach((e) => e.location && set.add(e.location));
+    return [...set].sort();
+  }, [locations, exams]);
+
+  const bumpRow = (id: string) => setRowRev((r) => ({ ...r, [id]: (r[id] ?? 0) + 1 }));
 
   const patch = async (id: string, data: Partial<AdminScheduledExam>) => {
     try {
@@ -91,6 +188,14 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
   const saveText = (e: AdminScheduledExam, field: keyof AdminScheduledExam, raw: string) => {
     const cur = (e[field] as any) ?? '';
     if (String(cur) === raw) return;
+    // Course Code → auto-fill the Course name from the matching subject.
+    if (field === 'courseCode' && raw.trim()) {
+      const match = subjectByCode.get(normCode(raw));
+      if (match && match.name !== e.courseName) {
+        patch(e.id, { courseCode: raw, courseName: match.name } as any).then(() => bumpRow(e.id));
+        return;
+      }
+    }
     patch(e.id, { [field]: raw } as any);
   };
   const saveDate = (e: AdminScheduledExam, field: 'examDate' | 'revisedDate', raw: string) => {
@@ -147,7 +252,14 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
     finally { setExporting(false); }
   };
 
-  const inputCls = 'w-full min-w-[70px] rounded border border-transparent bg-transparent px-1.5 py-1 text-xs focus:border-amber-400 focus:bg-white focus:outline-none hover:border-slate-200';
+  const groupKey = (x: AdminScheduledExam) => (x.examDate ? toInput(x.examDate) : x.revisedDate ? `r${toInput(x.revisedDate)}` : 'none');
+  const groupCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of exams) m.set(groupKey(e), (m.get(groupKey(e)) || 0) + 1);
+    return m;
+  }, [exams]);
+
+  const inputCls = 'w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-xs text-slate-700 transition-colors hover:bg-slate-100/70 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100';
 
   return (
     <div>
@@ -221,12 +333,40 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
         <div className="space-y-2">{[0, 1, 2].map((i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-white" />)}</div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-[1500px] border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                {['#', 'Serial Code', 'Start At', 'ESE Date', 'Day', 'Revised', 'Intake', 'Course Code', 'Course', 'Count',
-                  'Session 1', 'Session 2', 'Session 3', 'Location', 'Chief Examiner', 'Supervisor', 'Invigilator', 'Supporting', ''].map((h, i) => (
-                  <th key={i} className="whitespace-nowrap px-2 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">{h}</th>
+          {/* Autocomplete sources */}
+          <datalist id="dl-courses">
+            {subjects.map((s) => <option key={s.id} value={s.code}>{s.name}</option>)}
+          </datalist>
+          <datalist id="dl-intakes">
+            {intakeOptions.map((v) => <option key={v} value={v} />)}
+          </datalist>
+          <datalist id="dl-locations">
+            {locationOptions.map((v) => <option key={v} value={v} />)}
+          </datalist>
+          <div className="flex justify-end border-b border-slate-100 px-3 py-1.5">
+            <button onClick={resetWidths} className="text-[10px] font-medium text-slate-400 hover:text-slate-700">Reset column widths</button>
+          </div>
+          <table ref={tableRef} className="table-fixed border-collapse text-xs [&_td]:border [&_td]:border-slate-200/70 [&_th]:border [&_th]:border-slate-200" style={{ width: totalWidth }}>
+            <colgroup>
+              {colWidths.map((w, i) => (
+                <col key={i} ref={(el) => { colRefs.current[i] = el; }} style={{ width: w }} />
+              ))}
+            </colgroup>
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-slate-50 text-left">
+                {GRID_COLS.map((c, i) => (
+                  <th key={i} className="relative select-none px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="block truncate">{c.label}</span>
+                    {i < GRID_COLS.length - 1 && (
+                      <span
+                        onMouseDown={(e) => startResize(i, e)}
+                        title="Drag to resize"
+                        className="group absolute -right-[3px] top-0 z-10 flex h-full w-2 cursor-col-resize items-center justify-center"
+                      >
+                        <span className="h-3.5 w-px bg-slate-300 group-hover:bg-indigo-500" />
+                      </span>
+                    )}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -238,22 +378,38 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
                   </td>
                 </tr>
               )}
-              {exams.map((e, i) => (
-                <tr key={e.id} className="border-t border-slate-100 align-top hover:bg-amber-50/30">
-                  <td className="px-2 py-1 text-center text-[10px] font-bold text-slate-400">{i + 1}</td>
+              {exams.map((e, i) => {
+                const showBand = i === 0 || groupKey(e) !== groupKey(exams[i - 1]);
+                const count = groupCounts.get(groupKey(e)) ?? 0;
+                return (
+                <React.Fragment key={`${e.id}:${rowRev[e.id] ?? 0}`}>
+                {showBand && (
+                  <tr>
+                    <td colSpan={GRID_COLS.length} style={{ border: 'none', borderTop: i === 0 ? 'none' : '6px solid #f8fafc', borderBottom: '1px solid #e2e8f0' }}
+                      className="bg-slate-50/80 px-3 py-2">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-3.5 w-1 rounded-full bg-indigo-400" />
+                        <span className="text-[11px] font-semibold text-slate-600">{longDate(e.examDate || e.revisedDate)}</span>
+                        <span className="rounded-full bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{count} exam{count !== 1 ? 's' : ''}</span>
+                      </span>
+                    </td>
+                  </tr>
+                )}
+                <tr className="align-top transition-colors hover:bg-indigo-50/40">
+                  <td className="px-2 py-1.5 text-center text-[11px] font-medium text-slate-400">{i + 1}</td>
                   <td><input className={`${inputCls} font-mono`} defaultValue={e.serialCode || ''} placeholder="2026/165" onBlur={(ev) => saveText(e, 'serialCode', ev.target.value)} /></td>
                   <td><input className={inputCls} defaultValue={e.startAtLabel || ''} placeholder="28. June" onBlur={(ev) => saveText(e, 'startAtLabel', ev.target.value)} /></td>
-                  <td><input type="date" className={`${inputCls} min-w-[130px]`} defaultValue={toInput(e.examDate)} onBlur={(ev) => saveDate(e, 'examDate', ev.target.value)} /></td>
+                  <td><input type="date" className={inputCls} defaultValue={toInput(e.examDate)} onBlur={(ev) => saveDate(e, 'examDate', ev.target.value)} /></td>
                   <td className="px-2 py-1 text-[10px] text-slate-400">{e.weekday || weekdayOf(e.examDate) || '—'}</td>
-                  <td><input type="date" className={`${inputCls} min-w-[130px]`} defaultValue={toInput(e.revisedDate)} onBlur={(ev) => saveDate(e, 'revisedDate', ev.target.value)} /></td>
-                  <td><input className={`${inputCls} min-w-[110px]`} defaultValue={e.intake || ''} placeholder="3B WE/MOHE WE" onBlur={(ev) => saveText(e, 'intake', ev.target.value)} /></td>
-                  <td><input className={`${inputCls} font-semibold`} defaultValue={e.courseCode || ''} placeholder="BMBA1212" onBlur={(ev) => saveText(e, 'courseCode', ev.target.value)} /></td>
-                  <td><input className={`${inputCls} min-w-[180px]`} defaultValue={e.courseName || ''} placeholder="Course name" onBlur={(ev) => saveText(e, 'courseName', ev.target.value)} /></td>
-                  <td><input type="number" className={`${inputCls} min-w-[60px]`} defaultValue={e.expectedCount ?? ''} onBlur={(ev) => saveNumber(e, ev.target.value)} /></td>
+                  <td><input type="date" className={inputCls} defaultValue={toInput(e.revisedDate)} onBlur={(ev) => saveDate(e, 'revisedDate', ev.target.value)} /></td>
+                  <td><input list="dl-intakes" className={inputCls} defaultValue={e.intake || ''} placeholder="3B WE/MOHE WE" onBlur={(ev) => saveText(e, 'intake', ev.target.value)} /></td>
+                  <td><input list="dl-courses" className={`${inputCls} font-semibold`} defaultValue={e.courseCode || ''} placeholder="BMBA1212" onBlur={(ev) => saveText(e, 'courseCode', ev.target.value)} /></td>
+                  <td><input className={inputCls} defaultValue={e.courseName || ''} placeholder="Course name" onBlur={(ev) => saveText(e, 'courseName', ev.target.value)} /></td>
+                  <td><input type="number" className={inputCls} defaultValue={e.expectedCount ?? ''} onBlur={(ev) => saveNumber(e, ev.target.value)} /></td>
                   <td><input className={inputCls} defaultValue={e.session1 || ''} placeholder="9.00-11.30am" onBlur={(ev) => saveText(e, 'session1', ev.target.value)} /></td>
                   <td><input className={inputCls} defaultValue={e.session2 || ''} placeholder="1.00-4.00pm" onBlur={(ev) => saveText(e, 'session2', ev.target.value)} /></td>
                   <td><input className={inputCls} defaultValue={e.session3 || ''} onBlur={(ev) => saveText(e, 'session3', ev.target.value)} /></td>
-                  <td><input className={`${inputCls} min-w-[150px]`} defaultValue={e.location || ''} placeholder="Location" onBlur={(ev) => saveText(e, 'location', ev.target.value)} /></td>
+                  <td><input list="dl-locations" className={inputCls} defaultValue={e.location || ''} placeholder="Location" onBlur={(ev) => saveText(e, 'location', ev.target.value)} /></td>
                   {STAFF_SLOTS.map((slot) => (
                     <td key={slot.key} className="relative px-1 py-1">
                       <StaffCell
@@ -268,7 +424,9 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
                     <button onClick={() => removeRow(e)} className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                   </td>
                 </tr>
-              ))}
+                </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -294,9 +452,9 @@ function StaffCell({
   const names = selected.map((id) => staffById.get(id)?.name).filter(Boolean);
 
   return (
-    <div className="min-w-[130px]">
-      <button onClick={onToggleOpen}
-        className="w-full rounded border border-transparent px-1.5 py-1 text-left text-xs text-slate-600 hover:border-slate-200 hover:bg-white">
+    <div className="w-full">
+      <button onClick={onToggleOpen} title={names.join(', ')}
+        className="block w-full truncate rounded border border-transparent px-1.5 py-1 text-left text-xs text-slate-600 hover:border-slate-200 hover:bg-white">
         {names.length ? names.join(', ') : <span className="text-slate-300">— pick —</span>}
       </button>
       {open && (

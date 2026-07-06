@@ -98,11 +98,19 @@ export function parseExamScheduleWorkbook(buffer: Buffer): { rows: ParsedExamRow
     if (!courseCode && !course && !code) continue;
 
     const countStr = cell(r, idx.count).replace(/[^\d]/g, '');
+    // Source-sheet quirk: some rows put the exam date in the "Weekday" column.
+    // If the ESE Date cell is empty but the weekday cell holds a date, use it.
+    let examDate = parseDate(cell(r, idx.eseDate));
+    let weekday: string | undefined = cell(r, idx.weekday) || undefined;
+    if (!examDate && weekday) {
+      const asDate = parseDate(weekday);
+      if (asDate) { examDate = asDate; weekday = undefined; }
+    }
     rows.push({
       serialCode: code || undefined,
       startAtLabel: cell(r, idx.startAt) || undefined,
-      examDate: parseDate(cell(r, idx.eseDate)),
-      weekday: cell(r, idx.weekday) || undefined,
+      examDate,
+      weekday,
       revisedDate: parseDate(cell(r, idx.revised)),
       intake: cell(r, idx.intake) || undefined,
       courseCode: courseCode || undefined,

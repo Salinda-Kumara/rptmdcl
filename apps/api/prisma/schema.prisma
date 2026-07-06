@@ -357,6 +357,20 @@ model ExamStaff {
   @@index([deletedAt])
 }
 
+// Directory of exam venues/halls used when allocating exams.
+model ExamLocation {
+  id        String   @id @default(uuid())
+  name      String
+  capacity  Int?
+  note      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([deletedAt])
+}
+
 // One exam paper / timetable row within an ExaminationSchedule. Mirrors the
 // columns of the printed ESE schedule. Staff fields hold ExamStaff ids (a slot
 // can have several people, e.g. multiple invigilators).
