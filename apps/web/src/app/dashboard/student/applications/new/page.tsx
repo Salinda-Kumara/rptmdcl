@@ -449,11 +449,10 @@ export default function NewApplicationPage() {
               Please confirm your personal information for this application.
             </p>
 
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                You may correct any details below — these changes apply only to this application and
-                will <span className="font-semibold">not</span> change your registered student record.
+                Please confirm that your details are correct. If any details are incorrect, please update them accordingly.
               </p>
             </div>
 
