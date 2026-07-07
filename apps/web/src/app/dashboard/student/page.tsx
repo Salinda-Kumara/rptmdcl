@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Inbox,
+  XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { StudentShell } from '@/components/student/StudentShell';
@@ -39,7 +40,8 @@ export default function StudentDashboard() {
   const counts = {
     total: applications.length,
     approved: applications.filter((a) => a.status === 'APPROVED').length,
-    pending: applications.filter((a) => !['APPROVED', 'REJECTED', 'CANCELLED'].includes(a.status)).length,
+    pending: applications.filter((a) => !['APPROVED', 'REJECTED', 'PAYMENT_REJECTED', 'CANCELLED'].includes(a.status)).length,
+    rejected: applications.filter((a) => ['REJECTED', 'PAYMENT_REJECTED'].includes(a.status)).length,
     draft: applications.filter((a) => a.status === 'DRAFT').length,
   };
 
@@ -67,6 +69,13 @@ export default function StudentDashboard() {
       icon: Clock,
       tint: 'from-amber-500 to-orange-500',
       ring: 'bg-amber-50 text-amber-600',
+    },
+    {
+      label: 'Rejected',
+      value: counts.rejected,
+      icon: XCircle,
+      tint: 'from-rose-500 to-red-500',
+      ring: 'bg-rose-50 text-rose-600',
     },
     {
       label: 'Draft Applications',
@@ -103,7 +112,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {stats.map((s) => {
           const Icon = s.icon;
           return (

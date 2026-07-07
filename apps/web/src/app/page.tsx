@@ -97,7 +97,7 @@ export default function HomePage() {
 
       <footer className="bg-white border-t border-gray-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-gray-600">
-          <p>© 2024 School of Accounting and Business. All rights reserved.</p>
+          <p>© 2026 School of Accounting and Business of CA Sri Lanka. All rights reserved.</p>
         </div>
       </footer>
     </div>

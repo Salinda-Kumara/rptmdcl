@@ -367,7 +367,7 @@ export default function NewApplicationPage() {
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details</label>
             <input
-              type="text" placeholder="e.g. 2022-01"
+              type="text" placeholder="e.g : 17A WD"
               value={sel.previousExamIntake}
               onChange={(e) => updateField(subject.id, 'previousExamIntake', e.target.value)}
               className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"

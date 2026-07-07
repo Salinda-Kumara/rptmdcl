@@ -211,7 +211,7 @@ model Payment {
   id                String   @id @default(uuid())
   applicationId     String   @unique
   amount            Int
-  referenceNumber   String   @unique
+  referenceNumber   String   // not unique — the same reference may be reused
   slipFile          String?  // MinIO path
   verificationStatus String  @default("PENDING") // PENDING, VERIFIED, REJECTED
   verifiedBy        String?

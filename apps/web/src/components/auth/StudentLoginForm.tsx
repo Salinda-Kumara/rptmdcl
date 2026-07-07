@@ -47,7 +47,7 @@ export function StudentLoginForm() {
           <input
             id="batch"
             type="text"
-            placeholder="e.g., AA22-105"
+            placeholder="e.g : 17A WD"
             value={batchNumber}
             onChange={(e) => setBatchNumber(e.target.value)}
             required

@@ -174,15 +174,11 @@ export class ApplicationsService {
       }
     }
 
-    // Payment reference must be unique across all payments — reject a reused one
-    // with a clear message instead of a 500 unique-constraint crash.
+    // A reference is required, but it need not be unique — the same reference
+    // may be reused across applications.
     const reference = dto.paymentReferenceId?.trim();
     if (!reference) {
       throw new BadRequestException('A payment reference number is required');
-    }
-    const existingPayment = await this.prisma.payment.findUnique({ where: { referenceNumber: reference } });
-    if (existingPayment) {
-      throw new BadRequestException('This payment reference number has already been used. Please enter the reference from your own deposit slip.');
     }
 
     const serialNumber = await this.generateSerialNumber();

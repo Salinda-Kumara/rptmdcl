@@ -20,7 +20,7 @@ export default function StaffLoginPage() {
         </div>
 
         <p className="text-center text-sm text-gray-500 dark:text-gray-600 mt-4">
-          © 2024 School of Accounting and Business. All rights reserved.
+          © 2026 School of Accounting and Business of CA Sri Lanka. All rights reserved.
         </p>
       </div>
     </div>
