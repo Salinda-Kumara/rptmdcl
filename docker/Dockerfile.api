@@ -25,6 +25,8 @@ RUN npm run build -w @ermas/api
 # ─── Runtime ──────────────────────────────────────────────────────────────────
 FROM node:20-alpine
 
+RUN apk add --no-cache openssl libc6-compat
+
 WORKDIR /app
 
 # Full hoisted node_modules (includes prisma CLI, tsconfig-paths and the
