@@ -1,36 +1,39 @@
-# Frontend Dockerfile
-FROM node:18-alpine AS builder
+# ─── ERMAS Web (Next.js) ───────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Install workspace dependencies first (cached while lockfile is unchanged).
 COPY package.json package-lock.json ./
-COPY apps/web ./apps/web
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/web/package.json ./apps/web/package.json
 COPY packages ./packages
-COPY tsconfig.json ./
-
-# Install dependencies
 RUN npm ci
 
-# Build packages and web app
-RUN npm run build -w @ermas/shared
-RUN npm run build -w @ermas/ui
+# Source
+COPY tsconfig.json ./
+COPY apps/web ./apps/web
+
+# The browser calls the API directly, so this URL is baked in at build time.
+# Set it to the address the BROWSER will use, e.g. http://<ubuntu-ip>:3001/api/v1
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN npm run build -w @ermas/web
 
-FROM node:18-alpine
+# ─── Runtime (standalone output — no node_modules needed) ─────────────────────
+FROM node:20-alpine
 
 WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-# Install serve to run the Next.js app
-RUN npm install -g serve
-
-# Copy built application
-COPY --from=builder /app/apps/web/.next ./apps/web/.next
+# next.config.js `output: 'standalone'` emits a self-contained server.
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder /app/apps/web/package.json ./apps/web/
-
-WORKDIR /app/apps/web
 
 EXPOSE 3000
 
-CMD ["node_modules/.bin/next", "start"]
+CMD ["node", "apps/web/server.js"]

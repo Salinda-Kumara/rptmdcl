@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+apps/api/uploads
+.git
+*.xlsx
+*.xls
+*.pdf
+*.docx
+scratch*.txt
+docs

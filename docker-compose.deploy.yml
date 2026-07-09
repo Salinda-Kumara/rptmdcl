@@ -1,0 +1,75 @@
+# ERMAS — self-contained deployment (Postgres + API + Web).
+#
+#   1. Copy .env.deploy.example to .env and edit HOST_ADDR + secrets.
+#   2. docker compose -f docker-compose.deploy.yml up -d --build
+#   3. First time only, seed the database:
+#        docker compose -f docker-compose.deploy.yml exec api node dist/prisma/seed.js
+#
+# Web:  http://<HOST_ADDR>:3000      API:  http://<HOST_ADDR>:3001/api/v1
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ermas-postgres
+    environment:
+      POSTGRES_DB: ermas
+      POSTGRES_USER: ${POSTGRES_USER:-ermas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ermas123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-ermas} -d ermas']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks: [ermas]
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: ermas-api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ermas}:${POSTGRES_PASSWORD:-ermas123}@postgres:5432/ermas
+      LOGS_DATABASE_URL: postgresql://${POSTGRES_USER:-ermas}:${POSTGRES_PASSWORD:-ermas123}@postgres:5432/ermas_logs
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+      JWT_EXPIRATION: 3600
+      JWT_REFRESH_EXPIRATION: 604800
+      CORS_ORIGIN: http://${HOST_ADDR:-localhost}:3000
+      NODE_ENV: production
+      PORT: 3001
+    ports:
+      - '3001:3001'
+    volumes:
+      - uploads_data:/app/apps/api/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [ermas]
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+      args:
+        # Baked into the client bundle — must be the URL the BROWSER uses.
+        NEXT_PUBLIC_API_URL: http://${HOST_ADDR:-localhost}:3001/api/v1
+    container_name: ermas-web
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks: [ermas]
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  ermas:
+    driver: bridge

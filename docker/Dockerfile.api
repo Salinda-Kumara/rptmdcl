@@ -1,31 +1,52 @@
-# Backend API Dockerfile
-FROM node:18-alpine AS builder
+# ─── ERMAS API (NestJS + Prisma) ───────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+# Prisma engines need OpenSSL on Alpine.
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
-# Copy package files
+# Install workspace dependencies first (cached while lockfile is unchanged).
+# Every workspace manifest must exist for npm ci to accept the lockfile.
 COPY package.json package-lock.json ./
-COPY apps/api ./apps/api
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/web/package.json ./apps/web/package.json
 COPY packages ./packages
-COPY tsconfig.json ./
-
-# Install dependencies
 RUN npm ci
 
-# Build packages and API
-RUN npm run build -w @ermas/shared
-RUN npm run build -w @ermas/auth
+# Source
+COPY tsconfig.json ./
+COPY apps/api ./apps/api
+
+# Prisma client + compile (dist/src/main.js, dist/prisma/seed.js)
+RUN npx prisma generate --schema apps/api/prisma/schema.prisma
 RUN npm run build -w @ermas/api
 
-FROM node:18-alpine
+# ─── Runtime ──────────────────────────────────────────────────────────────────
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json ./
-COPY --from=builder /app/dist ./dist
+# Full hoisted node_modules (includes prisma CLI, tsconfig-paths and the
+# generated .prisma client — needed at runtime).
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder /app/apps/api/tsconfig.json ./apps/api/tsconfig.json
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+
+WORKDIR /app/apps/api
+RUN mkdir -p uploads
+
+ENV NODE_ENV=production
+ENV PORT=3001
+# Compiled code keeps "@/..." path aliases — tsconfig-paths resolves them
+# against dist/ at runtime.
+ENV TS_NODE_BASEURL=./dist
 
 EXPOSE 3001
 
-CMD ["node", "dist/apps/api/src/main.js"]
+# Sync the DB schema (additive, schema-as-truth — matches how this project
+# manages its database), then start the API.
+CMD ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss && exec node -r tsconfig-paths/register dist/src/main.js"]

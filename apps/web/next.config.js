@@ -2,6 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  // Self-contained server bundle for the Docker image (node server.js).
+  output: 'standalone',
+  eslint: {
+    // Lint runs in CI/dev; don't let style warnings fail the production image build.
+    ignoreDuringBuilds: true,
+  },
   typescript: {
     tsconfigPath: './tsconfig.json',
   },
