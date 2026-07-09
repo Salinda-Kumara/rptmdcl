@@ -4,9 +4,7 @@ import React from 'react';
 import { AuthScene } from '@/components/auth/AuthScene';
 import { StudentLoginForm } from '@/components/auth/StudentLoginForm';
 
-// Entry point = the STUDENT login page. Staff sign in at /login/staff —
-// deliberately not linked from here.
-export default function HomePage() {
+export default function StudentLoginPage() {
   return (
     <AuthScene title="Student Portal" subtitle="Repeat & Medical Exam Applications">
       <StudentLoginForm />

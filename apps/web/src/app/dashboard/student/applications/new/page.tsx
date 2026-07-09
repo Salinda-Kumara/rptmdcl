@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   RefreshCw,
   HeartPulse,
-  Landmark,
   CheckCircle2,
   AlertCircle,
   Check,
@@ -234,10 +233,13 @@ export default function NewApplicationPage() {
   const validateStep2 = () => {
     if (selected.length === 0) { setError('Select at least one subject'); return false; }
     for (const s of selected) {
-      if (s.caMarks === '' || s.caMarks === undefined) {
-        setError('CA Marks are mandatory for all selected subjects');
-        return false;
-      }
+      const code = subjects.find((subj) => subj.id === s.subjectId)?.code ?? 'subject';
+      if (s.caMarks === '' || s.caMarks === undefined) { setError(`CA Marks are required (${code})`); return false; }
+      if (!s.upcomingExamIntake.trim()) { setError(`Upcoming Exam Intake is required (${code})`); return false; }
+      if (!s.upcomingExamDate) { setError(`Upcoming Exam Date is required (${code})`); return false; }
+      if (!s.previousExamDate) { setError(`Date of Previous Exam is required (${code})`); return false; }
+      if (!s.previousExamIntake.trim()) { setError(`Previous exam Intake Details are required (${code})`); return false; }
+      if (appType === 'REPEAT' && !s.gradeEarned.trim()) { setError(`Grade Earned is required (${code})`); return false; }
     }
     setError('');
     return true;
@@ -315,7 +317,7 @@ export default function NewApplicationPage() {
       </div>
       <div>
         <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
-          Upcoming Exam Intake
+          Upcoming Exam Intake <span className="text-red-500">*</span>
           {sel.upcomingExamIntake && (
             <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">Auto-filled</span>
           )}
@@ -333,7 +335,7 @@ export default function NewApplicationPage() {
       </div>
       <div>
         <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
-          Upcoming Exam Date
+          Upcoming Exam Date <span className="text-red-500">*</span>
           {sel.upcomingExamDate && (
             <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">Auto-filled</span>
           )}
@@ -356,7 +358,7 @@ export default function NewApplicationPage() {
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Date of Previous Exam</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Date of Previous Exam <span className="text-red-500">*</span></label>
             <input
               type="date"
               value={sel.previousExamDate}
@@ -365,7 +367,7 @@ export default function NewApplicationPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details <span className="text-red-500">*</span></label>
             <input
               type="text" placeholder="e.g : 17A WD"
               value={sel.previousExamIntake}
@@ -375,7 +377,7 @@ export default function NewApplicationPage() {
           </div>
           {appType === 'REPEAT' && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned</label>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned <span className="text-red-500">*</span></label>
               <input
                 type="text" placeholder="e.g. C, D, F"
                 value={sel.gradeEarned}
@@ -406,41 +408,41 @@ export default function NewApplicationPage() {
       </div>
 
       {/* Step indicator */}
-      <div className="mx-auto mb-7 flex max-w-2xl items-center">
+      <div className="mx-auto mb-7 flex max-w-4xl items-center px-1">
         {STEPS.map((label, i) => {
           const num = i + 1;
           const done = step > num;
           const current = step === num;
           return (
             <React.Fragment key={label}>
-              <div className="flex flex-col items-center">
+              <div className="flex min-w-0 flex-col items-center">
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-all ${
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all sm:h-10 sm:w-10 sm:text-sm ${
                     done
                       ? 'bg-emerald-500 text-white'
                       : current
-                        ? 'bg-blue-600 text-white ring-4 ring-blue-100'
+                        ? 'bg-blue-600 text-white ring-2 ring-blue-100 sm:ring-4'
                         : 'bg-slate-100 text-slate-400'
                   }`}
                 >
-                  {done ? <Check className="h-5 w-5" /> : num}
+                  {done ? <Check className="h-4 w-4 sm:h-5 sm:w-5" /> : num}
                 </div>
-                <span className={`mt-2 text-xs font-medium ${current ? 'text-blue-600' : done ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <span className={`mt-1.5 text-center text-[10px] font-medium sm:mt-2 sm:text-xs ${current ? 'text-blue-600' : done ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {label}
                 </span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`mx-2 mb-6 h-0.5 flex-1 rounded ${step > num ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                <div className={`mx-1.5 mb-5 h-0.5 flex-1 rounded sm:mx-2 sm:mb-6 ${step > num ? 'bg-emerald-500' : 'bg-slate-200'}`} />
               )}
             </React.Fragment>
           );
         })}
       </div>
 
-      <div className="mx-auto max-w-3xl">
+      <div className="w-full">
         {/* Step 1 — Verify Your Details */}
         {step === 1 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex items-center gap-2">
               <UserCheck className="h-5 w-5 text-blue-600" />
               <h2 className="text-base font-semibold text-slate-900">Verify Your Details</h2>
@@ -594,14 +596,14 @@ export default function NewApplicationPage() {
 
         {/* Step 2 — Application Type */}
         {step === 2 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="text-base font-semibold text-slate-900">Select Application Type</h2>
             <p className="mt-0.5 text-sm text-slate-500">Choose the type of examination application.</p>
 
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {([
-                { type: 'REPEAT' as AppType, title: 'Repeat / Re-Repeat', desc: 'Repeat a failed subject', fee: 2600, icon: RefreshCw, tint: 'blue' },
-                { type: 'MEDICAL' as AppType, title: 'Medical Application', desc: 'Re-sit on medical grounds', fee: 5200, icon: HeartPulse, tint: 'rose' },
+                { type: 'REPEAT' as AppType, title: 'Repeat', desc: 'Repeat a failed subject', fee: 2600, icon: RefreshCw, tint: 'blue' },
+                { type: 'MEDICAL' as AppType, title: 'Medical', desc: 'Re-sit on medical grounds', fee: 5200, icon: HeartPulse, tint: 'rose' },
               ]).map(({ type, title, desc, fee, icon: Icon, tint }) => {
                 const active = appType === type;
                 return (
@@ -636,35 +638,6 @@ export default function NewApplicationPage() {
               })}
             </div>
 
-            {/* Bank details */}
-            <div className="mt-6 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <Landmark className="h-4 w-4 text-amber-600" />
-                <p className="text-sm font-semibold text-amber-900">Payment Instructions</p>
-              </div>
-              <p className="mb-3 text-xs text-amber-700">
-                Pay the examination fee to the account below before submitting. Keep the deposit slip / transaction reference.
-              </p>
-              <dl className="grid grid-cols-1 gap-x-4 gap-y-2.5 text-xs sm:grid-cols-2">
-                <div className="flex flex-col gap-0.5 sm:col-span-2">
-                  <dt className="text-amber-600">Account Name</dt>
-                  <dd className="font-medium text-amber-900">{BANK_DETAILS.name}</dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-amber-600">Bank</dt>
-                  <dd className="font-medium text-amber-900">{BANK_DETAILS.bank}</dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-amber-600">Branch</dt>
-                  <dd className="font-medium text-amber-900">{BANK_DETAILS.branch}</dd>
-                </div>
-                <div className="flex flex-col gap-0.5 sm:col-span-2">
-                  <dt className="text-amber-600">Account No</dt>
-                  <dd className="font-mono font-bold tracking-wide text-amber-900">{BANK_DETAILS.account}</dd>
-                </div>
-              </dl>
-            </div>
-
             <div className="mt-6 flex gap-3">
               <button onClick={() => setStep(1)} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Back
@@ -681,7 +654,7 @@ export default function NewApplicationPage() {
 
         {/* Step 3 — Subjects */}
         {step === 3 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="text-base font-semibold text-slate-900">Subjects Applied For</h2>
             <p className="mt-0.5 text-sm text-slate-500">
               Select each subject and fill the details. <span className="font-medium text-slate-700">CA Marks are mandatory.</span>
@@ -812,7 +785,7 @@ export default function NewApplicationPage() {
 
         {/* Step 4 — Review */}
         {step === 4 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="text-base font-semibold text-slate-900">Review &amp; Confirm</h2>
             <p className="mt-0.5 text-sm text-slate-500">Check the details before creating your application.</p>
 
@@ -835,7 +808,7 @@ export default function NewApplicationPage() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Type</span>
                 <span className="font-medium text-slate-900">
-                  {appType === 'REPEAT' ? 'Repeat / Re-Repeat Examination' : 'Re-sit on Medical Grounds'}
+                  {appType === 'REPEAT' ? 'Repeat' : 'Medical'}
                 </span>
               </div>
               <div className="flex justify-between">

@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Users, CreditCard, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import apiClient from '@/lib/api-client';
+import { AuthField, AuthButton, authError } from './AuthScene';
 
 export function StudentLoginForm() {
   const [batchNumber, setBatchNumber] = useState('');
   const [nic, setNic] = useState('');
+  const [showNic, setShowNic] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [batches, setBatches] = useState<string[]>([]);
@@ -38,65 +40,50 @@ export function StudentLoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-4">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="batch" className="block text-sm font-medium text-gray-700">
-            Batch Number
-          </label>
-          <input
-            id="batch"
-            type="text"
-            placeholder="e.g : 17A WD"
-            value={batchNumber}
-            onChange={(e) => setBatchNumber(e.target.value)}
-            required
-            list="batch-list"
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none"
-          />
-          <datalist id="batch-list">
-            {batches.map((batch) => (
-              <option key={batch} value={batch} />
-            ))}
-          </datalist>
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <AuthField
+        icon={<Users className="h-4 w-4" />}
+        trailing={<ChevronDown className="h-4 w-4" />}
+        id="batch"
+        type="text"
+        placeholder="Type to search batch..."
+        value={batchNumber}
+        onChange={(e) => setBatchNumber(e.target.value)}
+        required
+        list="batch-list"
+        autoComplete="off"
+      />
+      <datalist id="batch-list">
+        {batches.map((batch) => (
+          <option key={batch} value={batch} />
+        ))}
+      </datalist>
 
-        <div>
-          <label htmlFor="nic" className="block text-sm font-medium text-gray-700">
-            NIC Number
-          </label>
-          <input
-            id="nic"
-            type="text"
-            placeholder="e.g., 200012345678"
-            value={nic}
-            onChange={(e) => setNic(e.target.value)}
-            required
-            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-primary-500 focus:outline-none"
-          />
-        </div>
+      <AuthField
+        icon={<CreditCard className="h-4 w-4" />}
+        trailing={
+          <button
+            type="button"
+            onClick={() => setShowNic((s) => !s)}
+            title={showNic ? 'Hide NIC' : 'Show NIC'}
+            className="text-gray-400 transition-colors hover:text-purple-500"
+          >
+            {showNic ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        }
+        id="nic"
+        type={showNic ? 'text' : 'password'}
+        placeholder="Enter Your NIC Number"
+        value={nic}
+        onChange={(e) => setNic(e.target.value)}
+        required
+      />
 
-        {error && (
-          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+      {error && <div className={authError}>{error}</div>}
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full rounded-md bg-primary-600 px-4 py-2 font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-        >
-          {isLoading ? 'Logging in...' : 'Login'}
-        </button>
-      </form>
-
-      <div className="text-center text-sm text-gray-600">
-        Are you a staff member?{' '}
-        <Link href="/login/staff" className="text-primary-600 hover:underline">
-          Staff Login
-        </Link>
-      </div>
-    </div>
+      <AuthButton type="submit" disabled={isLoading}>
+        {isLoading ? 'Logging in…' : 'Login'}
+      </AuthButton>
+    </form>
   );
 }

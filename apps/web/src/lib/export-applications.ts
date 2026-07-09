@@ -64,24 +64,123 @@ function todayStamp(): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
 }
 
-/** Export applications to an .xlsx file. */
+/** Export applications to a professionally styled .xlsx file (exceljs). */
 export async function exportApplicationsExcel(apps: StaffApplication[]) {
-  const XLSX = await import('xlsx');
+  const ExcelJS = (await import('exceljs')).default ?? (await import('exceljs'));
 
-  const rows = apps.map((a) => {
-    const row: Record<string, string | number> = {};
-    for (const col of COLUMNS) row[col.header] = col.get(a);
-    return row;
+  const INDIGO = 'FF4F46E5';
+  const INDIGO_DARK = 'FF3730A3';
+  const ZEBRA = 'FFF6F7FB';
+  const BORDER = 'FFD8DCE6';
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'ERMAS';
+  wb.created = new Date();
+  const ws = wb.addWorksheet('Applications', {
+    views: [{ state: 'frozen', ySplit: 4 }], // freeze title + header rows
+    properties: { defaultRowHeight: 18 },
   });
 
-  const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map((c) => c.header) });
+  const nCols = COLUMNS.length;
+  const lastCol = ws.getColumn(nCols).letter;
 
-  // Column widths
-  ws['!cols'] = COLUMNS.map((c) => ({ wch: Math.max(c.header.length + 2, 14) }));
+  // ── Title band ──
+  ws.mergeCells(`A1:${lastCol}1`);
+  const title = ws.getCell('A1');
+  title.value = 'ERMAS — Applications Report';
+  title.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+  title.fill = { type: 'gradient', gradient: 'angle', degree: 0,
+    stops: [{ position: 0, color: { argb: INDIGO } }, { position: 1, color: { argb: INDIGO_DARK } }] };
+  title.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  ws.getRow(1).height = 34;
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Applications');
-  XLSX.writeFile(wb, `applications-${todayStamp()}.xlsx`);
+  ws.mergeCells(`A2:${lastCol}2`);
+  const meta = ws.getCell('A2');
+  const revenue = apps
+    .filter((a) => a.status === 'PAYMENT_VERIFIED' || a.status === 'APPROVED')
+    .reduce((s, a) => s + (a.totalFee ?? 0), 0);
+  meta.value = `School of Accounting and Business — CA Sri Lanka   ·   Generated ${new Date().toLocaleString('en-LK')}   ·   ${apps.length} application(s)   ·   Approved revenue: LKR ${revenue.toLocaleString('en-LK')}`;
+  meta.font = { name: 'Calibri', size: 9, color: { argb: 'FF6B7280' } };
+  meta.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+  ws.getRow(2).height = 16;
+  ws.getRow(3).height = 6; // spacer
+
+  // ── Header row ──
+  const headerRow = ws.getRow(4);
+  COLUMNS.forEach((c, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = c.header;
+    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: INDIGO } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = { bottom: { style: 'medium', color: { argb: INDIGO_DARK } } };
+  });
+  headerRow.height = 26;
+
+  // ── Data rows ──
+  const statusFont: Record<string, string> = {
+    'Approved': 'FF047857', 'Exam Rejected': 'FFB91C1C', 'Finance Rejected': 'FFB91C1C',
+    'New': 'FF1D4ED8', 'Finance Pending': 'FFB45309',
+  };
+  apps.forEach((a, r) => {
+    const row = ws.getRow(5 + r);
+    COLUMNS.forEach((c, i) => {
+      const cell = row.getCell(i + 1);
+      cell.value = c.get(a);
+      cell.font = { name: 'Calibri', size: 9.5 };
+      cell.alignment = { vertical: 'middle', wrapText: ['Subject Names', 'Remarks'].includes(c.header) };
+      if (r % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ZEBRA } };
+      cell.border = {
+        bottom: { style: 'thin', color: { argb: BORDER } },
+        right: { style: 'thin', color: { argb: BORDER } },
+      };
+      if (c.header === 'Total Fee (LKR)') { cell.numFmt = '#,##0.00'; cell.alignment = { horizontal: 'right' }; }
+      if (c.header === 'Subjects') cell.alignment = { horizontal: 'center' };
+      if (c.header === 'Status') {
+        const color = statusFont[String(cell.value)] ?? 'FF334155';
+        cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: color } };
+        cell.alignment = { horizontal: 'center' };
+      }
+    });
+  });
+
+  // ── Totals row ──
+  const totalRow = ws.getRow(5 + apps.length);
+  totalRow.getCell(1).value = `Total: ${apps.length}`;
+  totalRow.getCell(1).font = { name: 'Calibri', size: 10, bold: true };
+  const feeIdx = COLUMNS.findIndex((c) => c.header === 'Total Fee (LKR)') + 1;
+  const feeCell = totalRow.getCell(feeIdx);
+  feeCell.value = apps.reduce((s, a) => s + (a.totalFee ?? 0), 0);
+  feeCell.numFmt = '#,##0.00';
+  feeCell.font = { name: 'Calibri', size: 10, bold: true };
+  feeCell.alignment = { horizontal: 'right' };
+  totalRow.eachCell((cell) => {
+    cell.border = { top: { style: 'medium', color: { argb: INDIGO } } };
+  });
+
+  // ── Column widths + autofilter ──
+  const widths: Record<string, number> = {
+    'Submitted Date': 14, 'Serial No.': 13, 'Registration No.': 16, 'Student Name': 26,
+    'Batch': 10, 'NIC': 14, 'Mobile': 13, 'Email': 24, 'Type': 9, 'Subjects': 9,
+    'Subject Codes': 22, 'Subject Names': 36, 'Total Fee (LKR)': 14, 'Payment Ref.': 14,
+    'Status': 15, 'Approved/Rejected Date': 15, 'Remarks': 36,
+  };
+  COLUMNS.forEach((c, i) => { ws.getColumn(i + 1).width = widths[c.header] ?? 14; });
+  ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + apps.length, column: nCols } };
+
+  // ── Save ──
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf as unknown as BlobPart], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `applications-${todayStamp()}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 /** Export applications to a landscape .pdf file. */

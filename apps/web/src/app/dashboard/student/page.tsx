@@ -89,13 +89,13 @@ export default function StudentDashboard() {
   return (
     <StudentShell>
       {/* Welcome banner */}
-      <div className="relative mb-7 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-6 sm:p-8 shadow-lg shadow-indigo-200">
+      <div className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-5 shadow-lg shadow-indigo-200 sm:mb-7 sm:p-8">
         <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
         <div className="absolute -bottom-12 right-20 h-32 w-32 rounded-full bg-white/5" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium text-blue-100">Welcome back,</p>
-            <h1 className="mt-0.5 text-2xl font-bold text-white sm:text-3xl">{firstName} 👋</h1>
+            <h1 className="mt-0.5 text-xl font-bold text-white sm:text-3xl">{firstName} 👋</h1>
             <p className="mt-1.5 text-sm text-blue-100">
               {profile?.batch?.programme?.name || 'Loading programme...'}
               {profile?.registrationNumber ? ` · ${profile.registrationNumber}` : ''}
@@ -112,23 +112,23 @@ export default function StudentDashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:mb-7 md:grid-cols-3 xl:grid-cols-5">
         {stats.map((s) => {
           const Icon = s.icon;
           return (
             <div
               key={s.label}
-              className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:shadow-md"
+              className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-all hover:shadow-md"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">{s.label}</p>
-                  <p className="mt-2 text-3xl font-bold text-slate-900">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium text-slate-500">{s.label}</p>
+                  <p className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">
                     {loading ? <span className="text-slate-300">—</span> : s.value}
                   </p>
                 </div>
-                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${s.ring}`}>
-                  <Icon className="h-5 w-5" />
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${s.ring}`}>
+                  <Icon className="h-4 w-4" />
                 </div>
               </div>
               <div className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r ${s.tint} opacity-0 transition-opacity group-hover:opacity-100`} />
@@ -183,7 +183,7 @@ export default function StudentDashboard() {
                   <li key={app.id}>
                     <Link
                       href={`/dashboard/student/applications/${app.id}`}
-                      className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50"
+                      className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50 sm:gap-4 sm:px-5 sm:py-4"
                     >
                       <div
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${

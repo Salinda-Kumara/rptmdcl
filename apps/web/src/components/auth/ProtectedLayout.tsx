@@ -21,7 +21,7 @@ export function ProtectedLayout({ children }: ProtectedLayoutProps) {
       const loginPath =
         pathname?.startsWith('/dashboard/staff') || pathname?.startsWith('/dashboard/admin')
           ? '/login/staff'
-          : '/student';
+          : '/login/student';
       router.push(loginPath);
     }
   }, [hasHydrated, isAuthenticated, router, pathname]);

@@ -51,7 +51,7 @@ apiClient.interceptors.response.use(
             window.location.pathname.startsWith('/dashboard/staff') ||
             window.location.pathname.startsWith('/dashboard/admin')
               ? '/login/staff'
-              : '/student';
+              : '/login/student';
           window.location.href = loginPath;
         }
       }
