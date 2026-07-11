@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { staffApi } from '@/lib/staff-api';
-import { AuthField, AuthButton, authError } from './AuthScene';
+import { AuthField, AuthButton, AuthError } from './AuthScene';
 
 export function StaffLoginForm() {
   const [email, setEmail] = useState('');
@@ -57,7 +57,7 @@ export function StaffLoginForm() {
             type="button"
             onClick={() => setShowPassword((s) => !s)}
             title={showPassword ? 'Hide password' : 'Show password'}
-            className="text-gray-400 transition-colors hover:text-purple-500"
+            className="text-gray-400 transition-colors hover:text-emerald-500"
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -70,10 +70,10 @@ export function StaffLoginForm() {
         required
       />
 
-      {error && <div className={authError}>{error}</div>}
+      {error && <AuthError>{error}</AuthError>}
 
-      <AuthButton type="submit" disabled={isLoading}>
-        {isLoading ? 'Logging in…' : 'Login to Dashboard'}
+      <AuthButton type="submit" loading={isLoading}>
+        Sign In
       </AuthButton>
     </form>
   );

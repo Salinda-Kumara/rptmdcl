@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Users, CreditCard, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import apiClient from '@/lib/api-client';
-import { AuthField, AuthButton, authError } from './AuthScene';
+import { AuthField, AuthButton, AuthError } from './AuthScene';
 
 export function StudentLoginForm() {
   const [batchNumber, setBatchNumber] = useState('');
@@ -66,7 +66,7 @@ export function StudentLoginForm() {
             type="button"
             onClick={() => setShowNic((s) => !s)}
             title={showNic ? 'Hide NIC' : 'Show NIC'}
-            className="text-gray-400 transition-colors hover:text-purple-500"
+            className="text-gray-400 transition-colors hover:text-emerald-500"
           >
             {showNic ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -79,10 +79,10 @@ export function StudentLoginForm() {
         required
       />
 
-      {error && <div className={authError}>{error}</div>}
+      {error && <AuthError>{error}</AuthError>}
 
-      <AuthButton type="submit" disabled={isLoading}>
-        {isLoading ? 'Logging in…' : 'Login'}
+      <AuthButton type="submit" loading={isLoading}>
+        Login
       </AuthButton>
     </form>
   );

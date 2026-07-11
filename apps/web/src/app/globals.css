@@ -211,3 +211,23 @@
 
 /* Preserve intentional dark elements — sidebars, buttons, colored headers */
 /* (These already look correct in dark mode, no override needed)           */
+
+/* ── Auth (login) page animations ─────────────────── */
+@keyframes auth-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+.animate-auth-shake { animation: auth-shake 0.3s ease-in-out; }
+
+@keyframes auth-pulse-slow {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.1); }
+}
+.animate-auth-pulse-slow { animation: auth-pulse-slow 8s ease-in-out infinite; }
+
+@keyframes auth-slide-slow {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-auth-slide-slow { animation: auth-slide-slow 60s linear infinite; }
