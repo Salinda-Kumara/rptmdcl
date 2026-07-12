@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  GraduationCap, Search, ArrowLeft, FileText, ChevronRight,
+  GraduationCap, Search, ArrowLeft, FileText, ChevronRight, FileSpreadsheet, Loader2,
 } from 'lucide-react';
 import { adminApi, AdminStudent } from '@/lib/admin-api';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
@@ -123,6 +123,57 @@ export function StudentsPanel({ onNavigate }: Props) {
   const [skip, setSkip] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<AdminStudent | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  // Export all students matching the current search to an .xlsx file.
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      // The API caps `take` at 200 per request, so page through until we have all.
+      const q = search.trim() || undefined;
+      const PAGE_SIZE = 200;
+      const collected: AdminStudent[] = [];
+      let grandTotal = 0;
+      let page = 0;
+      // Guard the loop (max 1000 pages = 200k students).
+      for (; page < 1000; page++) {
+        const res = await adminApi.listStudents({ search: q, take: PAGE_SIZE, skip: page * PAGE_SIZE });
+        grandTotal = res.total;
+        collected.push(...res.items);
+        if (res.items.length < PAGE_SIZE || collected.length >= grandTotal) break;
+      }
+      const all = { items: collected, total: grandTotal };
+      const XLSX = await import('xlsx');
+      const COLS: { header: string; get: (s: AdminStudent) => string }[] = [
+        { header: 'Registration No', get: (s) => s.registrationNumber || '' },
+        { header: 'Title',           get: (s) => s.title || '' },
+        { header: 'Full Name',       get: (s) => s.fullName || '' },
+        { header: 'Name with Initials', get: (s) => s.nameWithInitials || '' },
+        { header: 'NIC',             get: (s) => s.nic || '' },
+        { header: 'Gender',          get: (s) => s.gender || '' },
+        { header: 'Batch',           get: (s) => s.batchNumber || '' },
+        { header: 'Intake',          get: (s) => s.intake || '' },
+        { header: 'Email',           get: (s) => s.email || '' },
+        { header: 'Mobile',          get: (s) => s.mobile || '' },
+        { header: 'Telephone',       get: (s) => s.telephone || '' },
+        { header: 'Permanent Address', get: (s) => s.permanentAddress || '' },
+        { header: 'Postal Address',  get: (s) => s.postalAddress || '' },
+      ];
+      const rows = all.items.map((s) => Object.fromEntries(COLS.map((c) => [c.header, c.get(s)])));
+      const ws = XLSX.utils.json_to_sheet(rows, { header: COLS.map((c) => c.header) });
+      ws['!cols'] = COLS.map((c) => ({ wch: Math.max(c.header.length + 2, 16) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Students');
+      const d = new Date();
+      const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+      XLSX.writeFile(wb, `students-${stamp}.xlsx`);
+    } catch (e) {
+      console.error('Export failed', e);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = (reset = false) => {
     setLoading(true);
@@ -156,16 +207,27 @@ export function StudentsPanel({ onNavigate }: Props) {
         </p>
       </div>
 
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-slate-500">{total.toLocaleString()} student(s)</span>
-        <div className="relative w-72">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, reg no, NIC, intake…"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative w-72">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Name, reg no, NIC, intake…"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+            />
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={exporting || total === 0}
+            title={search ? 'Export students matching the current search' : 'Export all students'}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-100 disabled:opacity-50"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            Export
+          </button>
         </div>
       </div>
 

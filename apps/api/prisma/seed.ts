@@ -18,7 +18,7 @@ async function main() {
     },
   });
 
-  await prisma.programme.upsert({
+  const bmbaProgramme = await prisma.programme.upsert({
     where: { code: 'BMBA' },
     update: { name: 'B.Mgt. in Business Analytics' },
     create: {
@@ -99,6 +99,100 @@ async function main() {
       update: { name: s.name, category: s.category },
       create: { code: s.code, name: s.name, category: s.category, programmeId: accountingProgramme.id },
     });
+  }
+
+  // B.Mgt. in Business Analytics — Handbook 2024 (General + Honours, deduped).
+  const bmbaSubjects = [
+    { code: 'BMBA 1113', name: 'Introduction to Business Management', category: 'Core' },
+    { code: 'BMBA 1123', name: 'Mathematics for Data Science', category: 'Core' },
+    { code: 'BMBA 1133', name: 'Introduction to Data Analytics', category: 'Core' },
+    { code: 'BMBA 1143', name: 'Accounting for Business', category: 'Core' },
+    { code: 'BMBA 1152', name: 'Personal Development and Academic Writing', category: 'Core' },
+    { code: 'BMBA 1162', name: 'Legal Environment', category: 'Core' },
+    { code: 'BMBA 1212', name: 'Human Resource Management', category: 'Core' },
+    { code: 'BMBA 1223', name: 'Statistical Methods for Management Decisions', category: 'Core' },
+    { code: 'BMBA 1232', name: 'Principles of Economics', category: 'Core' },
+    { code: 'BMBA 1242', name: 'Leadership in Organizations', category: 'Core' },
+    { code: 'BMBA 1253', name: 'Foundations of Business Analytics', category: 'Core' },
+    { code: 'BMBA 1262', name: 'Accounting Information Systems', category: 'Core' },
+    { code: 'BMBA 2112', name: 'Business Analytical Techniques', category: 'Core' },
+    { code: 'BMBA 2123', name: 'Financial Management', category: 'Core' },
+    { code: 'BMBA 2132', name: 'Marketing Management', category: 'Core' },
+    { code: 'BMBA 2142', name: 'Descriptive Analytics & Data Management', category: 'Core' },
+    { code: 'BMBA 2153', name: 'Cost and Management Accounting', category: 'Core' },
+    { code: 'BMBA 2163', name: 'Digital Transformation', category: 'Core' },
+    { code: 'BMBA 2212', name: 'Customer Analytics', category: 'Core' },
+    { code: 'BMBA 2223', name: 'Predictive Analytics with Excel', category: 'Core' },
+    { code: 'BMBA 2233', name: 'Data Science and Visualization for Business', category: 'Core' },
+    { code: 'BMBA 2243', name: 'Big Data Analytics', category: 'Core' },
+    { code: 'BMBA 2253', name: 'Operations Analytics', category: 'Core' },
+    { code: 'BMBA 2262', name: 'Competitor Analysis and Market Intelligence', category: 'Core' },
+    { code: 'BMBA 3113', name: 'Introduction to Machine Learning for Data Analysis', category: 'Core' },
+    { code: 'BMBA 3123', name: 'Information Security and Fraud Analytics', category: 'Core' },
+    { code: 'BMBA 3133', name: 'Marketing Analytics', category: 'Core' },
+    { code: 'BMBA 3142', name: 'Applied Modelling for Management Decisions', category: 'Core' },
+    { code: 'BMBA 3153', name: 'Simulation for Complex Business Problems', category: 'Core' },
+    { code: 'BMBA 3163', name: 'Database Design', category: 'Core' },
+    { code: 'BMBA 3174', name: 'Research Methodology', category: 'Core' },
+    { code: 'BMBA 3213', name: 'Artificial Neural Network for Business Analytics', category: 'Core' },
+    { code: 'BMBA 3223', name: 'People Analytics', category: 'Core' },
+    { code: 'BMBA 3232', name: 'Supply Chain Analytics', category: 'Core' },
+    { code: 'BMBA 3243', name: 'Decision Support Systems', category: 'Core' },
+    { code: 'BMBA 3253', name: 'Artificial Intelligence', category: 'Core' },
+    { code: 'BMBA 3263', name: 'Data Mining and Data Warehousing', category: 'Core' },
+    { code: 'BMBA 3273', name: 'Strategic Management', category: 'Core' },
+    { code: 'BMBA 3284', name: 'Business Analytics Internship', category: 'Core' },
+    { code: 'BMBA 3293', name: 'Business Analytics Project', category: 'Core' },
+    { code: 'BMBA 4113', name: 'Business Strategy', category: 'Core' },
+    { code: 'BMBA 4123', name: 'Strategic Information Systems', category: 'Core' },
+    { code: 'BMBA 4133', name: 'Research Methodology', category: 'Core' },
+    { code: 'BMBA 4143', name: 'Introduction to Blockchain Technology', category: 'Core' },
+    { code: 'BMBA 4153', name: 'Social Media Strategy', category: 'Core' },
+    { code: 'BMBA 4163', name: 'Forensic Data Analytics', category: 'Core' },
+    { code: 'BMBA 4214', name: 'Business Analytics Internship', category: 'Core' },
+    { code: 'BMBA 4226', name: 'Dissertation', category: 'Core' },
+    { code: 'BMBA 4232', name: 'Advance Business Intelligence', category: 'Elective' },
+    { code: 'BMBA 4242', name: 'Business Strategic Analysis', category: 'Elective' },
+    { code: 'BMBA 4252', name: 'Business Metrics for Data-Driven Companies', category: 'Elective' },
+  ];
+
+  for (const s of bmbaSubjects) {
+    await prisma.subject.upsert({
+      where: { code_programmeId: { code: s.code, programmeId: bmbaProgramme.id } },
+      update: { name: s.name, category: s.category },
+      create: { code: s.code, name: s.name, category: s.category, programmeId: bmbaProgramme.id },
+    });
+  }
+
+  // Exam-duty staff directory (used when scheduling exams).
+  const examStaff: { name: string; role: string }[] = [
+    { name: 'Dilshan Dissanayake', role: 'EXAMINER' },
+    { name: 'Ishara Ranasinghe', role: 'EXAMINER' },
+    { name: 'Isuri Chandeepa', role: 'EXAMINER' },
+    { name: 'Isuri Samarawickrama', role: 'EXAMINER' },
+    { name: 'Lakdinithi Subasinghe', role: 'EXAMINER' },
+    { name: 'Malintha Perera', role: 'EXAMINER' },
+    { name: 'Nipunee Jayasuriya', role: 'EXAMINER' },
+    { name: 'Nishanthini Simon', role: 'EXAMINER' },
+    { name: 'Sirini Punsara', role: 'EXAMINER' },
+    { name: 'Supun Madhushanka', role: 'EXAMINER' },
+    { name: 'Hasitha', role: 'SUPERVISOR' },
+    { name: 'Pasindu', role: 'SUPERVISOR' },
+    { name: 'Sandun', role: 'SUPERVISOR' },
+    { name: 'Shashinika', role: 'SUPERVISOR' },
+    { name: 'Ishanka', role: 'INVIGILATOR' },
+    { name: 'Nimansha', role: 'INVIGILATOR' },
+    { name: 'Niyumi', role: 'INVIGILATOR' },
+    { name: 'Salinda', role: 'INVIGILATOR' },
+    { name: 'Sasini', role: 'INVIGILATOR' },
+    { name: 'Thilanka', role: 'INVIGILATOR' },
+    { name: 'Vajira', role: 'INVIGILATOR' },
+    { name: 'Viraj', role: 'INVIGILATOR' },
+    { name: 'Roshan', role: 'SUPPORTING' },
+  ];
+  for (const p of examStaff) {
+    const existing = await prisma.examStaff.findFirst({ where: { name: p.name, role: p.role, deletedAt: null } });
+    if (!existing) await prisma.examStaff.create({ data: { name: p.name, role: p.role } });
   }
 
   // NOTE: Students and batches are NOT seeded — they are imported from Excel via

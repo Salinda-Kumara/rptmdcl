@@ -171,6 +171,7 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
 
   const normCode = (c: string) => c.replace(/\s+/g, '').toLowerCase();
   const subjectByCode = useMemo(() => new Map(subjects.map((s) => [normCode(s.code), s])), [subjects]);
+  const subjectByName = useMemo(() => new Map(subjects.map((s) => [s.name.trim().toLowerCase(), s])), [subjects]);
   // Distinct intakes: batch intakes + any already used in this schedule.
   const intakeOptions = useMemo(() => {
     const set = new Set<string>();
@@ -205,6 +206,14 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
       const match = subjectByCode.get(normCode(raw));
       if (match && match.name !== e.courseName) {
         patch(e.id, { courseCode: raw, courseName: match.name } as any).then(() => bumpRow(e.id));
+        return;
+      }
+    }
+    // Course Name → auto-fill the Course code from the matching subject.
+    if (field === 'courseName' && raw.trim()) {
+      const match = subjectByName.get(raw.trim().toLowerCase());
+      if (match && normCode(match.code) !== normCode(e.courseCode || '')) {
+        patch(e.id, { courseName: raw, courseCode: match.code } as any).then(() => bumpRow(e.id));
         return;
       }
     }
@@ -290,10 +299,6 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
             className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-100 disabled:opacity-50">
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Export Excel
           </button>
-          <button onClick={addRow} disabled={adding}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-50">
-            {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add Row
-          </button>
           {schedule?.published ? (
             <button onClick={doUnpublish} disabled={publishing}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-50">
@@ -375,6 +380,9 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
           <datalist id="dl-courses">
             {subjects.map((s) => <option key={s.id} value={s.code}>{s.name}</option>)}
           </datalist>
+          <datalist id="dl-course-names">
+            {subjects.map((s) => <option key={s.id} value={s.name}>{s.code}</option>)}
+          </datalist>
           <datalist id="dl-intakes">
             {intakeOptions.map((v) => <option key={v} value={v} />)}
           </datalist>
@@ -442,7 +450,7 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
                   <td><input type="date" className={inputCls} defaultValue={toInput(e.revisedDate)} onBlur={(ev) => saveDate(e, 'revisedDate', ev.target.value)} /></td>
                   <td><input list="dl-intakes" className={inputCls} defaultValue={e.intake || ''} placeholder="3B WE/MOHE WE" onBlur={(ev) => saveText(e, 'intake', ev.target.value)} /></td>
                   <td><input list="dl-courses" className={`${inputCls} font-semibold`} defaultValue={e.courseCode || ''} placeholder="BMBA1212" onBlur={(ev) => saveText(e, 'courseCode', ev.target.value)} /></td>
-                  <td><input className={inputCls} defaultValue={e.courseName || ''} placeholder="Course name" onBlur={(ev) => saveText(e, 'courseName', ev.target.value)} /></td>
+                  <td><input list="dl-course-names" className={inputCls} defaultValue={e.courseName || ''} placeholder="Course name" onBlur={(ev) => saveText(e, 'courseName', ev.target.value)} /></td>
                   <td><input type="number" className={inputCls} defaultValue={e.expectedCount ?? ''} onBlur={(ev) => saveNumber(e, ev.target.value)} /></td>
                   <td><input className={inputCls} defaultValue={e.session1 || ''} placeholder="9.00-11.30am" onBlur={(ev) => saveText(e, 'session1', ev.target.value)} /></td>
                   <td><input className={inputCls} defaultValue={e.session2 || ''} placeholder="1.00-4.00pm" onBlur={(ev) => saveText(e, 'session2', ev.target.value)} /></td>
@@ -465,6 +473,20 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
                 </React.Fragment>
                 );
               })}
+              {/* Add-row line — "+" in the # column */}
+              <tr className="hover:bg-amber-50/40">
+                <td className="px-2 py-1.5 text-center">
+                  <button onClick={addRow} disabled={adding} title="Add row"
+                    className="mx-auto flex h-5 w-5 items-center justify-center rounded bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50">
+                    {adding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  </button>
+                </td>
+                <td colSpan={GRID_COLS.length - 1} style={{ border: 'none' }}>
+                  <button onClick={addRow} disabled={adding} className="px-3 py-1.5 text-left text-xs font-medium text-amber-600 hover:text-amber-700 disabled:opacity-50">
+                    Add row
+                  </button>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
