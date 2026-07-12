@@ -26,8 +26,14 @@ export function ExamSchedulesPanel({ onOpen }: Props) {
 
   const load = () => {
     setLoading(true);
-    Promise.all([adminApi.listSchedules(), adminApi.listProgrammes()])
-      .then(([s, p]) => { setItems(s); setProgrammes(p); }).catch(() => {}).finally(() => setLoading(false));
+    // Load schedules on their own — a user may have `schedules` permission but
+    // not `programmes`, so don't let the programmes call block the list.
+    adminApi.listSchedules()
+      .then(setItems)
+      .catch(() => setError('Failed to load schedules'))
+      .finally(() => setLoading(false));
+    // Programmes are only needed for the name label + the create/edit dropdown.
+    adminApi.listProgrammes().then(setProgrammes).catch(() => setProgrammes([]));
   };
   useEffect(load, []);
 

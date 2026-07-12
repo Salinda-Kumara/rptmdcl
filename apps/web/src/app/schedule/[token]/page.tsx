@@ -52,11 +52,16 @@ export default function PublicSchedulePage({ params }: { params: Promise<{ token
       .finally(() => setLoading(false));
   }, [token]);
 
+  // The effective exam date is the revised date when one is set, otherwise the
+  // original ESE date — a rescheduled exam shows under its new date.
+  const effDate = (e: PublicExam) => e.revisedDate || e.examDate || null;
+
   const groups = useMemo(() => {
     const map = new Map<string, PublicExam[]>();
     for (const e of data?.exams ?? []) {
-      const key = e.examDate || e.revisedDate || 'Unscheduled';
-      const bucket = e.examDate ? new Date(e.examDate).toISOString().slice(0, 10) : e.revisedDate ? new Date(e.revisedDate).toISOString().slice(0, 10) : 'z';
+      const d = e.revisedDate || e.examDate;
+      const key = d || 'Unscheduled';
+      const bucket = d ? new Date(d).toISOString().slice(0, 10) : 'z';
       const gk = `${bucket}::${key}`;
       if (!map.has(gk)) map.set(gk, []);
       map.get(gk)!.push(e);
@@ -104,8 +109,11 @@ export default function PublicSchedulePage({ params }: { params: Promise<{ token
           <div className="mt-6 space-y-6">
             {groups.map(([gk, rows]) => (
               <section key={gk} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="border-b border-amber-100 bg-amber-50 px-5 py-3">
-                  <p className="text-sm font-bold text-amber-900">{longDate(rows[0].examDate || rows[0].revisedDate)}</p>
+                <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-5 py-3">
+                  <p className="text-sm font-bold text-amber-900">{longDate(effDate(rows[0]))}</p>
+                  {rows[0].revisedDate && (
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Revised</span>
+                  )}
                 </div>
                 <div className="divide-y divide-slate-100">
                   {rows.map((e) => (

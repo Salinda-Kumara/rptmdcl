@@ -150,13 +150,16 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
 
   const load = () => {
     setLoading(true);
-    Promise.all([adminApi.listSchedules(), adminApi.listScheduledExams(scheduleId), adminApi.listExamStaff()])
-      .then(([schedules, ex, st]) => {
+    // Core timetable — keep this independent of the staff-directory call so a
+    // missing secondary permission can't blank the schedule.
+    Promise.all([adminApi.listSchedules(), adminApi.listScheduledExams(scheduleId)])
+      .then(([schedules, ex]) => {
         setSchedule(schedules.find((s) => s.id === scheduleId) ?? null);
-        setExams(ex); setStaff(st);
+        setExams(ex);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    adminApi.listExamStaff().then(setStaff).catch(() => {});
   };
   useEffect(load, [scheduleId]); // eslint-disable-line
 
@@ -220,7 +223,11 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
     patch(e.id, { [field]: raw } as any);
   };
   const saveDate = (e: AdminScheduledExam, field: 'examDate' | 'revisedDate', raw: string) => {
-    if (!raw) return; // clearing not supported inline
+    if (!raw) {
+      // Emptying the field clears the stored date.
+      if (e[field]) patch(e.id, { [field]: null } as any);
+      return;
+    }
     if (toInput(e[field]) === raw) return;
     patch(e.id, { [field]: raw } as any);
   };
@@ -273,7 +280,8 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
     finally { setExporting(false); }
   };
 
-  const groupKey = (x: AdminScheduledExam) => (x.examDate ? toInput(x.examDate) : x.revisedDate ? `r${toInput(x.revisedDate)}` : 'none');
+  // Group by the effective date — the revised date takes precedence over the ESE date.
+  const groupKey = (x: AdminScheduledExam) => (x.revisedDate ? toInput(x.revisedDate) : x.examDate ? toInput(x.examDate) : 'none');
   const groupCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const e of exams) m.set(groupKey(e), (m.get(groupKey(e)) || 0) + 1);
@@ -435,7 +443,8 @@ export function ScheduleDetailPanel({ scheduleId, onBack }: Props) {
                       className="bg-slate-50/80 px-3 py-2">
                       <span className="inline-flex items-center gap-2">
                         <span className="h-3.5 w-1 rounded-full bg-indigo-400" />
-                        <span className="text-[11px] font-semibold text-slate-600">{longDate(e.examDate || e.revisedDate)}</span>
+                        <span className="text-[11px] font-semibold text-slate-600">{longDate(e.revisedDate || e.examDate)}</span>
+                        {e.revisedDate && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">Revised</span>}
                         <span className="rounded-full bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{count} exam{count !== 1 ? 's' : ''}</span>
                       </span>
                     </td>

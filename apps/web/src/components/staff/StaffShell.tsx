@@ -12,9 +12,11 @@ import { DashboardPanel } from './panels/DashboardPanel';
 import { ApplicationsPanel } from './panels/ApplicationsPanel';
 import { ApplicationDetailPanel } from './panels/ApplicationDetailPanel';
 import { ReportsPanel } from '@/components/admin/panels/ReportsPanel';
+import { ExamSchedulesPanel } from '@/components/admin/panels/ExamSchedulesPanel';
+import { ScheduleDetailPanel } from '@/components/admin/panels/ScheduleDetailPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'reports' | 'admin';
+type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'reports' | 'admin';
 
 interface NavItem {
   view: View;
@@ -46,6 +48,7 @@ export function StaffShell() {
   const { isAdmin, permissions, name } = useMyPermissions();
   const [view, setView] = useState<View>('dashboard');
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navigate = (v: string, id?: string) => {
@@ -55,6 +58,8 @@ export function StaffShell() {
     window.scrollTo({ top: 0 });
   };
 
+  const openSchedule = (id: string) => { setSelectedScheduleId(id); setView('schedule-detail'); window.scrollTo({ top: 0 }); };
+
   const visibleNav = NAV.filter((n) => {
     if (n.adminOnly) return isAdmin;
     if (!n.resource) return true;
@@ -63,7 +68,7 @@ export function StaffShell() {
 
   const displayName = name || user?.name || user?.email || 'Staff';
   const initials = displayName.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-  const activeView = view === 'app-detail' ? 'applications' : view;
+  const activeView = view === 'app-detail' ? 'applications' : view === 'schedule-detail' ? 'schedules' : view;
 
   const SidebarContent = () => (
     <>
@@ -151,7 +156,8 @@ export function StaffShell() {
             {view === 'dashboard'    && <DashboardPanel onNavigate={navigate} />}
             {view === 'applications' && <ApplicationsPanel onNavigate={navigate} />}
             {view === 'app-detail'   && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} />}
-            {view === 'schedules'    && <ComingSoon label="Schedules" />}
+            {view === 'schedules'    && <ExamSchedulesPanel onOpen={openSchedule} />}
+            {view === 'schedule-detail' && selectedScheduleId && <ScheduleDetailPanel scheduleId={selectedScheduleId} onBack={() => navigate('schedules')} />}
             {view === 'reports'      && <ReportsPanel />}
             {view === 'admin'        && <ComingSoon label="Admin Console" />}
           </main>

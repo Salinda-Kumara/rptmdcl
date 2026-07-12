@@ -51,20 +51,38 @@ export function useMyPermissions(): MyAuth {
   const [state, setState] = useState<MyAuth>({ isAdmin: false, permissions: {}, loading: true });
 
   useEffect(() => {
-    apiClient
-      .get('/auth/profile')
-      .then((r) => {
-        const d = r.data;
-        setState({
-          isAdmin: !!d?.isAdmin,
-          // permissions is already a resource→level map from effectivePermissions()
-          permissions: (d?.permissions ?? {}) as PermissionMap,
-          name: d?.user?.staffUser?.name || d?.user?.email,
-          email: d?.user?.email,
-          loading: false,
-        });
-      })
-      .catch(() => setState({ isAdmin: false, permissions: {}, loading: false }));
+    let cancelled = false;
+
+    const load = () => {
+      apiClient
+        .get('/auth/profile')
+        .then((r) => {
+          if (cancelled) return;
+          const d = r.data;
+          setState({
+            isAdmin: !!d?.isAdmin,
+            // permissions is already a resource→level map from effectivePermissions()
+            permissions: (d?.permissions ?? {}) as PermissionMap,
+            name: d?.user?.staffUser?.name || d?.user?.email,
+            email: d?.user?.email,
+            loading: false,
+          });
+        })
+        .catch(() => { if (!cancelled) setState((s) => ({ ...s, loading: false })); });
+    };
+
+    load();
+
+    // Re-check permissions when the tab regains focus, so a permission an admin
+    // just granted appears without the user having to log out and back in.
+    const onFocus = () => { if (document.visibilityState === 'visible') load(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
   }, []);
 
   return state;

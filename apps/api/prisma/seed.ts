@@ -28,6 +28,22 @@ async function main() {
     },
   });
 
+  // Normalize legacy Applied-Accounting programme codes into BSAA so imported
+  // students (reg-numbers beginning "BSc") inherit its subjects. Reg prefixes
+  // BSc/BAA/AA all mean Applied Accounting.
+  const legacyAA = await prisma.programme.findMany({ where: { code: { in: ['BSC', 'BAA', 'AA'] } } });
+  for (const lp of legacyAA) {
+    await prisma.batch.updateMany({ where: { programmeId: lp.id }, data: { programmeId: accountingProgramme.id } });
+    const [batches, subjects] = await Promise.all([
+      prisma.batch.count({ where: { programmeId: lp.id } }),
+      prisma.subject.count({ where: { programmeId: lp.id } }),
+    ]);
+    if (batches === 0 && subjects === 0) {
+      await prisma.programme.delete({ where: { id: lp.id } });
+      console.log(`  ↪ folded legacy programme "${lp.code}" into BSAA`);
+    }
+  }
+
   // Helper: replace a staff user's permission set (PBAC).
   const grant = async (userId: string, perms: { resource: string; level: 'VIEW' | 'FULL' }[]) => {
     await prisma.userPermission.deleteMany({ where: { userId } });

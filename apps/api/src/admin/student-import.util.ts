@@ -54,21 +54,31 @@ export function deriveIntake(reg: string): string {
   return [batch, ...middle, stream].filter(Boolean).join(' ');
 }
 
-/** Programme display names keyed by registration-number prefix. */
+/**
+ * Registration-number prefixes that map onto a canonical programme code.
+ * "BSc" (Applied Accounting) students are stored under the BSAA programme so
+ * they inherit its subjects.
+ */
+const CODE_ALIASES: Record<string, string> = {
+  BSC: 'BSAA',   // BSc/... → BSc in Applied Accounting
+  BAA: 'BSAA',   // legacy Applied Accounting prefix
+};
+
+/** Programme display names keyed by canonical programme code. */
 export const PROGRAMME_NAMES: Record<string, string> = {
-  BAA: 'BSc Applied Accounting',
-  BMBA: 'Bachelor of Management (Business Analytics)',
-  BSC: 'BSc Degree',
+  BSAA: 'BSc in Applied Accounting',
+  BMBA: 'B.Mgt. in Business Analytics',
   SAB: 'SAB (Legacy)',
   SPE: 'Special Programme',
   GEN: 'General Programme',
   OTHER: 'Other / Legacy',
 };
 
-/** Programme code derived from the registration-number prefix. */
+/** Programme code derived from the registration-number prefix (with aliases applied). */
 export function programmeCodeOf(reg: string): string {
   const segs = String(reg ?? '').split('/');
-  return segs.length > 1 ? segs[0].trim().toUpperCase() : 'OTHER';
+  const raw = segs.length > 1 ? segs[0].trim().toUpperCase() : 'OTHER';
+  return CODE_ALIASES[raw] ?? raw;
 }
 
 const norm = (v: unknown) => String(v ?? '').trim();
