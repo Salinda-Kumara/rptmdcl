@@ -22,6 +22,7 @@ export const RESOURCES: ResourceDef[] = [
   { key: 'batches', label: 'Batches', description: 'Full can manage batches' },
   { key: 'schedules', label: 'Exam Schedules', description: 'Full can manage exam schedules' },
   { key: 'reports', label: 'Reports', description: 'View reporting dashboards', viewOnly: true },
+  { key: 'admissions', label: 'Admissions', description: 'View approved applications and print admission cards', viewOnly: true },
   { key: 'users', label: 'Staff & Permissions', description: 'Full can create staff and assign permissions' },
 ];
 

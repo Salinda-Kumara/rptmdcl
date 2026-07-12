@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import {
-  LayoutDashboard, FileText, CalendarDays,
+  LayoutDashboard, FileText, CalendarDays, GraduationCap,
   BarChart3, LogOut, ShieldCheck, Menu, X, Crown,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
@@ -14,9 +14,10 @@ import { ApplicationDetailPanel } from './panels/ApplicationDetailPanel';
 import { ReportsPanel } from '@/components/admin/panels/ReportsPanel';
 import { ExamSchedulesPanel } from '@/components/admin/panels/ExamSchedulesPanel';
 import { ScheduleDetailPanel } from '@/components/admin/panels/ScheduleDetailPanel';
+import { AdmissionsPanel } from '@/components/admin/panels/AdmissionsPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'reports' | 'admin';
+type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'admissions' | 'reports' | 'admin';
 
 interface NavItem {
   view: View;
@@ -30,6 +31,7 @@ const NAV: NavItem[] = [
   { view: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
   { view: 'applications', label: 'Applications',  icon: FileText,      resource: 'applications' },
   { view: 'schedules',    label: 'Schedules',     icon: CalendarDays,  resource: 'schedules' },
+  { view: 'admissions',   label: 'Admissions',    icon: GraduationCap, resource: 'admissions' },
   { view: 'reports',      label: 'Reports',       icon: BarChart3,     resource: 'reports' },
   { view: 'admin',        label: 'Admin Console', icon: Crown,         adminOnly: true },
 ];
@@ -158,6 +160,7 @@ export function StaffShell() {
             {view === 'app-detail'   && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} />}
             {view === 'schedules'    && <ExamSchedulesPanel onOpen={openSchedule} />}
             {view === 'schedule-detail' && selectedScheduleId && <ScheduleDetailPanel scheduleId={selectedScheduleId} onBack={() => navigate('schedules')} />}
+            {view === 'admissions'   && <AdmissionsPanel />}
             {view === 'reports'      && <ReportsPanel />}
             {view === 'admin'        && <ComingSoon label="Admin Console" />}
           </main>

@@ -408,6 +408,34 @@ export class ApplicationsService {
     });
   }
 
+  // Approved applications eligible for an admission card (finance-verified /
+  // approved). Used by the Admissions screen.
+  async findAdmissions() {
+    return this.prisma.application.findMany({
+      where: { deletedAt: null, status: { in: ['PAYMENT_VERIFIED', 'APPROVED'] } },
+      include: {
+        student: true,
+        applicationSubjects: { include: { subject: true } },
+        payment: true,
+        approvals: true,
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+  }
+
+  // Timetable rows (course code → exam date + session times) from schedules with
+  // "enable for apply" on — the admission card fills its Date/Time columns from these.
+  async admissionScheduledExams() {
+    return this.prisma.scheduledExam.findMany({
+      where: { schedule: { applyEnabled: true, deletedAt: null } },
+      select: {
+        courseCode: true, courseName: true, examDate: true, revisedDate: true,
+        session1: true, session2: true, session3: true, location: true,
+      },
+      orderBy: { examDate: 'asc' },
+    });
+  }
+
   // Staff dashboard aggregate statistics.
   async getStats() {
     const base = { deletedAt: null, status: { not: 'DRAFT' } };

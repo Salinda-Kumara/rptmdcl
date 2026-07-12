@@ -91,6 +91,24 @@ export class ApplicationsController {
     return this.applicationsService.findAllStaff({ status, statuses, type, search, dateFrom, dateTo });
   }
 
+  // Admissions — approved applications and the exam timetable used to print
+  // admission cards. Declared before ':id' so 'admissions' isn't matched as an id.
+  @Get('admissions')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('admissions', 'VIEW')
+  @ApiOperation({ summary: 'Get approved applications for admission (staff)' })
+  getAdmissions() {
+    return this.applicationsService.findAdmissions();
+  }
+
+  @Get('admissions/exams')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('admissions', 'VIEW')
+  @ApiOperation({ summary: 'Get exam timetable rows (course → date/time) for admission cards' })
+  getAdmissionExams() {
+    return this.applicationsService.admissionScheduledExams();
+  }
+
   @Get(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermission('applications', 'VIEW')

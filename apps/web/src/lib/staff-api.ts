@@ -33,6 +33,18 @@ export interface StaffApplication extends Application {
   };
 }
 
+// A timetable row used to fill the admission card's Date/Time columns.
+export interface AdmissionExam {
+  courseCode?: string | null;
+  courseName?: string | null;
+  examDate?: string | null;
+  revisedDate?: string | null;
+  session1?: string | null;
+  session2?: string | null;
+  session3?: string | null;
+  location?: string | null;
+}
+
 export const staffApi = {
   getStats: () => apiClient.get<StaffStats>('/applications/stats').then((r) => r.data),
 
@@ -49,6 +61,12 @@ export const staffApi = {
 
   getApplication: (id: string) =>
     apiClient.get<StaffApplication>(`/applications/${id}`).then((r) => r.data),
+
+  // Admissions — approved applications and the exam timetable for admission cards.
+  getAdmissions: () =>
+    apiClient.get<StaffApplication[]>('/applications/admissions').then((r) => r.data),
+  getAdmissionExams: () =>
+    apiClient.get<AdmissionExam[]>('/applications/admissions/exams').then((r) => r.data),
 
   examReview: (id: string, action: 'FORWARD' | 'REJECT', remark?: string) =>
     apiClient.patch<StaffApplication>(`/applications/${id}/exam-review`, { action, remark }).then((r) => r.data),

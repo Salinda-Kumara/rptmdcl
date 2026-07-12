@@ -21,6 +21,7 @@ import { ExamSchedulesPanel } from './panels/ExamSchedulesPanel';
 import { ScheduleDetailPanel } from './panels/ScheduleDetailPanel';
 import { ExamStaffPanel }     from './panels/ExamStaffPanel';
 import { LocationsPanel }     from './panels/LocationsPanel';
+import { AdmissionsPanel }    from './panels/AdmissionsPanel';
 import { ApplicationsPanel }  from '@/components/staff/panels/ApplicationsPanel';
 import { ApplicationDetailPanel } from '@/components/staff/panels/ApplicationDetailPanel';
 
@@ -31,7 +32,7 @@ import { LogsPanel }           from './panels/LogsPanel';
 import { ThemeToggle }         from '@/components/ThemeToggle';
 
 type View =
-  | 'dashboard' | 'applications' | 'app-detail' | 'reports'
+  | 'dashboard' | 'applications' | 'app-detail' | 'admissions' | 'reports'
   | 'users' | 'students-import' | 'students' | 'programmes' | 'subjects' | 'batches' | 'schedules' | 'schedule-detail' | 'exam-staff' | 'exam-locations' | 'logs';
 
 interface TopNavItem { view: View; label: string; icon: React.ComponentType<{ className?: string }>; resource?: string; }
@@ -42,6 +43,7 @@ const TOP_NAV: TopNavItem[] = [
   { view: 'applications',     label: 'Applications',    icon: FileText,      resource: 'applications' },
   { view: 'students-import',  label: 'Students',        icon: UserSquare2,   resource: 'students' },
   { view: 'schedules',        label: 'Exam Schedules',  icon: CalendarDays,  resource: 'schedules' },
+  { view: 'admissions',       label: 'Admissions',      icon: GraduationCap, resource: 'admissions' },
   { view: 'reports',          label: 'Reports',         icon: BarChart3,     resource: 'reports' },
 ];
 
@@ -333,6 +335,7 @@ export function AdminShell() {
             {view === 'dashboard'      && <AdminDashboardPanel onNavigate={navigate} />}
             {view === 'applications'   && <ApplicationsPanel onNavigate={navigate} />}
             {view === 'app-detail'     && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} onViewLogs={isAdmin ? openLogsForSerial : undefined} />}
+            {view === 'admissions'     && <AdmissionsPanel />}
             {view === 'reports'        && <ReportsPanel />}
             {view === 'users'          && <UsersPanel />}
             {view === 'students-import' && <StudentsPanel onNavigate={navigate} />}
