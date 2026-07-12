@@ -196,6 +196,10 @@ model ApplicationSubject {
   previousExamDate    DateTime?
   previousExamIntake  String?
   gradeEarned         String?   // For repeat: grade earned in previous attempt
+  // Admission-card print tracking (per subject).
+  admissionPrinted    Boolean   @default(false)
+  admissionPrintedAt  DateTime?
+  admissionPrintedBy  String?   // email/id of the staff who marked it printed
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 

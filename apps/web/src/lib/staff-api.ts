@@ -67,6 +67,8 @@ export const staffApi = {
     apiClient.get<StaffApplication[]>('/applications/admissions').then((r) => r.data),
   getAdmissionExams: () =>
     apiClient.get<AdmissionExam[]>('/applications/admissions/exams').then((r) => r.data),
+  markAdmissionPrinted: (subjectId: string, printed: boolean) =>
+    apiClient.patch(`/applications/admissions/${subjectId}/printed`, { printed }).then((r) => r.data),
 
   examReview: (id: string, action: 'FORWARD' | 'REJECT', remark?: string) =>
     apiClient.patch<StaffApplication>(`/applications/${id}/exam-review`, { action, remark }).then((r) => r.data),

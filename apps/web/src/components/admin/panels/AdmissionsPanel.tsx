@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { GraduationCap, Search, Printer, Loader2, Inbox, ChevronRight } from 'lucide-react';
+import { GraduationCap, Search, Printer, Loader2, Inbox, ChevronRight, X } from 'lucide-react';
 import { staffApi, StaffApplication, AdmissionExam } from '@/lib/staff-api';
 import { printAdmissionCard } from '@/lib/admission-card-pdf';
+import { useMyPermissions } from '@/lib/permissions';
 
 const normCode = (c?: string | null) => (c ?? '').toUpperCase().replace(/\s+/g, '');
 const fmtDate = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).replace(/\//g, '.') : '—';
 
 export function AdmissionsPanel() {
+  const { isAdmin } = useMyPermissions();
   const [apps, setApps] = useState<StaffApplication[]>([]);
   const [exams, setExams] = useState<AdmissionExam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +98,21 @@ export function AdmissionsPanel() {
     }
   };
 
+  // Mark/unmark a subject's admission as printed (persisted). Staff can only set
+  // it printed; unmarking a printed one is admin-only (enforced server-side too).
+  const togglePrinted = async (subId: string, printed: boolean) => {
+    try {
+      await staffApi.markAdmissionPrinted(subId, printed);
+      setApps((prev) => prev.map((a) => ({
+        ...a,
+        applicationSubjects: (a.applicationSubjects ?? []).map((s) =>
+          s.id === subId ? { ...s, admissionPrinted: printed } : s),
+      })));
+    } catch (e) {
+      console.error('Failed to update printed status', e);
+    }
+  };
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -123,16 +140,27 @@ export function AdmissionsPanel() {
               Clear date
             </button>
           )}
-          <input
-            value={fSubject}
-            onChange={(e) => setFSubject(e.target.value)}
-            list="admission-subjects"
-            placeholder="Filter by subject…"
-            className="w-56 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-          />
-          <datalist id="admission-subjects">
-            {subjectOptions.map(([code, label]) => <option key={code} value={label} />)}
-          </datalist>
+          <div className="relative">
+            <input
+              value={fSubject}
+              onChange={(e) => setFSubject(e.target.value)}
+              list="admission-subjects"
+              placeholder="Filter by subject…"
+              className="w-56 rounded-lg border border-slate-300 bg-white px-3 py-2 pr-8 text-sm text-slate-700 placeholder-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            />
+            {fSubject && (
+              <button
+                onClick={() => setFSubject('')}
+                title="Clear subject filter"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-gray-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            <datalist id="admission-subjects">
+              {subjectOptions.map(([code, label]) => <option key={code} value={label} />)}
+            </datalist>
+          </div>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -159,26 +187,28 @@ export function AdmissionsPanel() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                  <th className="px-4 py-3 text-right">#</th>
+                  <th className="px-4 py-3">Serial</th>
                   <th className="px-4 py-3">Reg No</th>
                   <th className="px-4 py-3">Candidate</th>
                   <th className="px-4 py-3">Batch</th>
                   <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Serial</th>
                   <th className="px-4 py-3 text-center">Subjects</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-                {list.map((a) => {
+                {list.map((a, i) => {
                   const subs = visibleSubs(a);
                   const open = expanded.has(a.id);
                   return (
                     <React.Fragment key={a.id}>
                       <tr className="hover:bg-slate-50/60 dark:hover:bg-gray-800/40">
+                        <td className="px-4 py-3 text-right text-xs text-slate-400">{i + 1}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{a.serialNumber ?? '—'}</td>
                         <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-gray-300">{a.student?.registrationNumber ?? '—'}</td>
                         <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{a.student?.fullName ?? '—'}</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-gray-400">{a.student?.batchNumber ?? '—'}</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-gray-400">{a.type === 'MEDICAL' ? 'Medical' : 'Repeat'}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{a.serialNumber ?? '—'}</td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => toggle(a.id)}
@@ -192,7 +222,7 @@ export function AdmissionsPanel() {
                       </tr>
                       {open && (
                         <tr className="bg-slate-50/50 dark:bg-gray-800/30">
-                          <td colSpan={6} className="px-4 py-3">
+                          <td colSpan={7} className="px-4 py-3">
                             <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-gray-700">
                               <table className="w-full text-sm">
                                 <thead>
@@ -200,19 +230,34 @@ export function AdmissionsPanel() {
                                     <th className="px-4 py-2">Subject Code</th>
                                     <th className="px-4 py-2">Subject Name</th>
                                     <th className="px-4 py-2">Date of Exam</th>
+                                    <th className="px-4 py-2 text-center">Printed</th>
                                     <th className="px-4 py-2 text-right">Admission</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-                                  {subs.map((s) => (
+                                  {subs.map((s) => {
+                                    const printed = !!s.admissionPrinted;
+                                    const lockedForStaff = printed && !isAdmin; // staff can't reprint / unmark
+                                    return (
                                     <tr key={s.id} className="bg-white dark:bg-gray-900">
                                       <td className="px-4 py-2.5 font-mono text-xs text-slate-700 dark:text-gray-300">{s.subject?.code ?? '—'}</td>
                                       <td className="px-4 py-2.5 text-slate-700 dark:text-gray-300">{s.subject?.name ?? '—'}</td>
                                       <td className="px-4 py-2.5 text-slate-600 dark:text-gray-400">{dateOf(s.subject?.code)}</td>
+                                      <td className="px-4 py-2.5 text-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={printed}
+                                          disabled={lockedForStaff}
+                                          onChange={(e) => togglePrinted(s.id, e.target.checked)}
+                                          title={lockedForStaff ? 'Marked printed — only an admin can reset' : 'Mark as printed'}
+                                          className="h-4 w-4 cursor-pointer accent-emerald-600 disabled:cursor-not-allowed"
+                                        />
+                                      </td>
                                       <td className="px-4 py-2.5 text-right">
                                         <button
                                           onClick={() => doPrint(a, s.id)}
-                                          disabled={printing === s.id}
+                                          disabled={printing === s.id || lockedForStaff}
+                                          title={lockedForStaff ? 'Already printed — only an admin can reprint' : 'Print admission card'}
                                           className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400"
                                         >
                                           {printing === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
@@ -220,7 +265,8 @@ export function AdmissionsPanel() {
                                         </button>
                                       </td>
                                     </tr>
-                                  ))}
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>

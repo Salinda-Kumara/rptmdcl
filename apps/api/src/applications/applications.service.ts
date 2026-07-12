@@ -423,6 +423,24 @@ export class ApplicationsService {
     });
   }
 
+  // Mark (or unmark) a subject's admission card as printed. Staff may set it to
+  // printed; only an admin may reset a printed one back to unprinted.
+  async markAdmissionPrinted(subjectId: string, user: any, printed: boolean) {
+    const sub = await this.prisma.applicationSubject.findUnique({ where: { id: subjectId } });
+    if (!sub) throw new NotFoundException('Application subject not found');
+    if (!user?.isAdmin && sub.admissionPrinted && !printed) {
+      throw new ForbiddenException('Only an administrator can reset a printed admission');
+    }
+    return this.prisma.applicationSubject.update({
+      where: { id: subjectId },
+      data: {
+        admissionPrinted: printed,
+        admissionPrintedAt: printed ? new Date() : null,
+        admissionPrintedBy: printed ? (user?.staffUser?.name ?? user?.email ?? user?.id ?? null) : null,
+      },
+    });
+  }
+
   // Timetable rows (course code → exam date + session times) from schedules with
   // "enable for apply" on — the admission card fills its Date/Time columns from these.
   async admissionScheduledExams() {

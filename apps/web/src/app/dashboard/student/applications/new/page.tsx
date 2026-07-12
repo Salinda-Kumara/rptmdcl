@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
 import { applicationsApi, studentsApi, Subject, ApplicantDetails, ScheduledExamInfo } from '@/lib/applications-api';
+import apiClient from '@/lib/api-client';
 
 type AppType = 'REPEAT' | 'MEDICAL';
 type Category = 'REPEAT' | 'MEDICAL' | '1ST_ATTEMPT';
@@ -107,6 +108,7 @@ export default function NewApplicationPage() {
   const [error, setError] = useState('');
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [scheduledExams, setScheduledExams] = useState<ScheduledExamInfo[]>([]);
+  const [batchList, setBatchList] = useState<string[]>([]);
   const [subjectSearch, setSubjectSearch] = useState('');
 
   // Personal details (pre-filled from the student record; corrections here are
@@ -122,6 +124,9 @@ export default function NewApplicationPage() {
       .finally(() => setLoadingSubjects(false));
 
     studentsApi.getScheduledExams().then(setScheduledExams).catch(() => {});
+
+    // Batch/intake list for the "Intake Details" autosuggest.
+    apiClient.get<string[]>('/auth/batches').then((r) => setBatchList(r.data)).catch(() => {});
 
     studentsApi.getProfile()
       .then((p: any) => {
@@ -190,13 +195,24 @@ export default function NewApplicationPage() {
     gradeEarned: '',
   });
 
+  // Prefer the revised date, else the original exam date, as a yyyy-mm-dd string.
+  const scheduleDate = (e: ScheduledExamInfo): string => {
+    const d = e.revisedDate ?? e.examDate;
+    return d ? new Date(d).toISOString().slice(0, 10) : '';
+  };
+
   // Match a subject to a published timetable row by course code (spaces/case are
-  // ignored). When several rows share a code, prefer the one for the student's own
-  // intake; otherwise take the earliest.
+  // ignored). Only rows whose exam date is still UPCOMING (today or later) are
+  // used — a passed exam date is not auto-filled. Prefer the student's own intake.
   const normCode = (c?: string | null) => (c ?? '').toUpperCase().replace(/\s+/g, '');
   const scheduleForSubject = (subject: Subject): ScheduledExamInfo | null => {
     const code = normCode(subject.code);
-    const matches = scheduledExams.filter((e) => normCode(e.courseCode) === code);
+    // Today's date in Sri Lanka (Asia/Colombo), so the "passed exam" cutoff
+    // follows local date rather than UTC. en-CA formats as YYYY-MM-DD.
+    const todayISO = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Colombo' });
+    const matches = scheduledExams.filter(
+      (e) => normCode(e.courseCode) === code && scheduleDate(e) && scheduleDate(e) >= todayISO,
+    );
     if (!matches.length) return null;
     const myIntake = (applicant.intake || applicant.batchNumber || '').toLowerCase().trim();
     if (myIntake) {
@@ -204,13 +220,8 @@ export default function NewApplicationPage() {
       const pref = matches.find((e) => (e.intake ?? '').toLowerCase().includes(token) && token.length > 1);
       if (pref) return pref;
     }
-    return matches[0];
-  };
-
-  // Prefer the revised date, else the original exam date, as a yyyy-mm-dd string.
-  const scheduleDate = (e: ScheduledExamInfo): string => {
-    const d = e.revisedDate ?? e.examDate;
-    return d ? new Date(d).toISOString().slice(0, 10) : '';
+    // Earliest upcoming date first.
+    return [...matches].sort((a, b) => scheduleDate(a).localeCompare(scheduleDate(b)))[0];
   };
 
   // Changing the application type re-normalizes any already-selected subject
@@ -390,6 +401,7 @@ export default function NewApplicationPage() {
             <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details <span className="text-red-500">*</span></label>
             <input
               type="text" placeholder="e.g : 17A WD"
+              list="intake-list"
               value={sel.previousExamIntake}
               onChange={(e) => updateField(subject.id, 'previousExamIntake', e.target.value)}
               className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -676,6 +688,10 @@ export default function NewApplicationPage() {
         {/* Step 3 — Subjects */}
         {step === 3 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            {/* Intake/batch suggestions for the "Intake Details" fields. */}
+            <datalist id="intake-list">
+              {batchList.map((b) => <option key={b} value={b} />)}
+            </datalist>
             <h2 className="text-base font-semibold text-slate-900">Subjects Applied For</h2>
             <p className="mt-0.5 text-sm text-slate-500">
               Select each subject and fill the details. <span className="font-medium text-slate-700">CA Marks are mandatory.</span>

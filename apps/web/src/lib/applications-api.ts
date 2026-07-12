@@ -13,6 +13,7 @@ export interface ApplicationSubject {
   category: string;
   caMarks?: number;
   subject: Subject;
+  admissionPrinted?: boolean;
 }
 
 export interface Payment {

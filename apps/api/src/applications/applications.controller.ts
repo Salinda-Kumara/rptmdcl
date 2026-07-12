@@ -109,6 +109,14 @@ export class ApplicationsController {
     return this.applicationsService.admissionScheduledExams();
   }
 
+  @Patch('admissions/:subjectId/printed')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('admissions', 'VIEW')
+  @ApiOperation({ summary: "Mark a subject's admission card as printed (staff); reset needs admin" })
+  markAdmissionPrinted(@Req() req: any, @Param('subjectId') subjectId: string, @Body('printed') printed?: boolean) {
+    return this.applicationsService.markAdmissionPrinted(subjectId, req.user, printed !== false);
+  }
+
   @Get(':id')
   @UseGuards(PermissionsGuard)
   @RequirePermission('applications', 'VIEW')
