@@ -46,7 +46,8 @@ export default function StudentDashboard() {
   };
 
   const recent = applications.slice(0, 5);
-  const firstName = (profile?.fullName || user?.name || 'Student').split(' ')[0];
+  // Greet with at least the first three words of the name (or the whole name if shorter).
+  const firstName = (profile?.fullName || user?.name || 'Student').trim().split(/\s+/).slice(0, 3).join(' ');
 
   const stats = [
     {

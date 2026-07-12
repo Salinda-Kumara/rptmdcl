@@ -127,6 +127,9 @@ export const studentsApi = {
   getSubjects: () => apiClient.get<Subject[]>('/students/subjects').then((r) => r.data),
   getExamSchedules: () => apiClient.get<ExamSchedule[]>('/students/exam-schedules').then((r) => r.data),
   getScheduledExams: () => apiClient.get<ScheduledExamInfo[]>('/students/scheduled-exams').then((r) => r.data),
+  // Update ONLY permanent address, mobile and email on the master student record.
+  updateContact: (data: { permanentAddress?: string; mobile?: string; email?: string }) =>
+    apiClient.patch('/students/profile/contact', data).then((r) => r.data),
 };
 
 export const documentsApi = {

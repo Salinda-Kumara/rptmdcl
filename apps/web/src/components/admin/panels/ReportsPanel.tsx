@@ -9,6 +9,7 @@ import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { formatFee } from '@/lib/applications-api';
 import { exportApplicationsExcel, exportApplicationsPdf } from '@/lib/export-applications';
 import { printApplicationById, openBlankTab } from '@/lib/application-form-pdf';
+import { useMyPermissions } from '@/lib/permissions';
 
 type DateMode = 'single' | 'range';
 
@@ -34,6 +35,7 @@ function stageOf(status: string) {
 }
 
 export function ReportsPanel() {
+  const { name: myName, email: myEmail } = useMyPermissions();
   const [mode, setMode] = useState<DateMode>('range');
   const [singleDate, setSingleDate] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -55,7 +57,7 @@ export function ReportsPanel() {
     const win = openBlankTab(); // open synchronously to keep the user-gesture
     setPrinting(id);
     try {
-      await printApplicationById(id, win);
+      await printApplicationById(id, win, myName || myEmail || undefined);
     } catch (err) {
       console.error('Print failed', err);
     } finally {

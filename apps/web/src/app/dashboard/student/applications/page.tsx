@@ -157,7 +157,7 @@ export default function ApplicationsListPage() {
                   </span>
                 </div>
                 <p className="mt-1 truncate text-xs text-slate-500">
-                  {app.applicationSubjects.map((s) => s.subject.code).join(', ')}
+                  {app.applicationSubjects.map((s) => `${s.subject.code} — ${s.subject.name}`).join(', ')}
                 </p>
                 <p className="mt-0.5 text-xs text-slate-400">
                   {new Date(app.createdAt).toLocaleDateString('en-LK', { year: 'numeric', month: 'short', day: 'numeric' })}

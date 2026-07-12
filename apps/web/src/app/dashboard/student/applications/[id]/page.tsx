@@ -13,9 +13,12 @@ import {
   Trash2,
   Send,
   AlertCircle,
+  Printer,
+  Loader2,
 } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
 import { DocumentsCard } from '@/components/student/DocumentsCard';
+import { printApplicationPacket, openBlankTab } from '@/lib/application-form-pdf';
 import {
   applicationsApi,
   Application,
@@ -45,6 +48,7 @@ export default function ApplicationDetailPage() {
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [printing, setPrinting] = useState(false);
 
   const missingDocs: DocumentType[] = app
     ? (REQUIRED_DOCS[app.type] || []).filter((t) => !docs.some((d) => d.documentType === t))
@@ -93,12 +97,30 @@ export default function ApplicationDetailPage() {
 
   return (
     <StudentShell>
-      <Link
-        href="/dashboard/student/applications"
-        className="mb-5 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to Applications
-      </Link>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <Link
+          href="/dashboard/student/applications"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Applications
+        </Link>
+        {app && app.status !== 'DRAFT' && (
+          <button
+            onClick={async () => {
+              if (printing) return;
+              const win = openBlankTab(); // open synchronously to keep the user gesture
+              setPrinting(true);
+              const nic = (app.applicantDetails as any)?.nic || (app as any).student?.nic || '';
+              try { await printApplicationPacket(app, win, nic ? `NIC ${nic}` : undefined); } catch (e) { console.error(e); } finally { setPrinting(false); }
+            }}
+            disabled={printing}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+          >
+            {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+            Print Application
+          </button>
+        )}
+      </div>
 
       {loading ? (
         <div className="space-y-4">

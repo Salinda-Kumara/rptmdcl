@@ -159,6 +159,26 @@ export default function NewApplicationPage() {
     return true;
   };
 
+  const [savingDetails, setSavingDetails] = useState(false);
+  // On "Confirm & Continue": persist ONLY permanent address, mobile and email to
+  // the master student record. All other edits stay on this application only.
+  const continueFromDetails = async () => {
+    if (!validateDetails()) return;
+    setSavingDetails(true);
+    try {
+      await studentsApi.updateContact({
+        permanentAddress: applicant.permanentAddress.trim(),
+        mobile: applicant.mobile.trim(),
+        email: applicant.email.trim(),
+      });
+    } catch {
+      // Best-effort — the application snapshot still carries the values.
+    } finally {
+      setSavingDetails(false);
+    }
+    setStep(2);
+  };
+
   const emptySubject = (subjectId: string): SelectedSubject => ({
     subjectId,
     category: defaultCategoryFor(appType),
@@ -586,10 +606,11 @@ export default function NewApplicationPage() {
             )}
 
             <button
-              onClick={() => { if (validateDetails()) setStep(2); }}
-              className="mt-6 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              onClick={continueFromDetails}
+              disabled={savingDetails}
+              className="mt-6 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
             >
-              Confirm &amp; Continue
+              {savingDetails ? 'Saving…' : 'Confirm & Continue'}
             </button>
           </div>
         )}

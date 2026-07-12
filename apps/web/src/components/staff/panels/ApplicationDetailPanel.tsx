@@ -159,7 +159,7 @@ function FieldRow({ label, value, on, onToggle, canVerify }: {
 interface Props { id: string; onBack: () => void; onViewLogs?: (serial: string) => void; }
 
 export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
-  const { isAdmin, permissions } = useMyPermissions();
+  const { isAdmin, permissions, name: myName, email: myEmail } = useMyPermissions();
   const [app, setApp]       = useState<StaffApplication | null>(null);
   const [loading, setLoading]   = useState(true);
   const [remark, setRemark]     = useState('');
@@ -327,7 +327,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                 if (printing) return;
                 const win = openBlankTab(); // open synchronously to keep the user-gesture
                 setPrinting(true);
-                try { await printApplicationPacket(app, win); } catch (e) { console.error(e); } finally { setPrinting(false); }
+                try { await printApplicationPacket(app, win, myName || myEmail || undefined); } catch (e) { console.error(e); } finally { setPrinting(false); }
               }}
               disabled={printing}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"

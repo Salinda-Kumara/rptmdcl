@@ -22,6 +22,25 @@ export class StudentsService {
     return student;
   }
 
+  // Update only the student's own contact fields on the master record.
+  // (permanent address, mobile, email). Used when a student corrects these on
+  // the new-application form.
+  async updateContact(
+    userId: string,
+    dto: { permanentAddress?: string; mobile?: string; email?: string },
+  ) {
+    const student = await this.prisma.student.findFirst({ where: { userId } });
+    if (!student) throw new NotFoundException('Student not found');
+    return this.prisma.student.update({
+      where: { id: student.id },
+      data: {
+        ...(dto.permanentAddress !== undefined ? { permanentAddress: dto.permanentAddress } : {}),
+        ...(dto.mobile !== undefined ? { mobile: dto.mobile } : {}),
+        ...(dto.email !== undefined ? { email: dto.email } : {}),
+      },
+    });
+  }
+
   async getSubjects(userId: string) {
     const student = await this.prisma.student.findFirst({
       where: { userId },

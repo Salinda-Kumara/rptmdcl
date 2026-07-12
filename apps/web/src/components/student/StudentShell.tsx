@@ -42,8 +42,15 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
     studentsApi.getProfile().then(setProfile).catch(() => {});
   }, []);
 
-  const isActive = (item: (typeof NAV)[number]) =>
-    item.exact ? pathname === item.href : pathname.startsWith(item.href);
+  // Pick a single active item: an exact route (e.g. New Application) wins over a
+  // prefix route (My Applications), so both never highlight at once.
+  const activeHref = (() => {
+    const exact = NAV.find((i) => i.exact && pathname === i.href);
+    if (exact) return exact.href;
+    return NAV.filter((i) => !i.exact && pathname.startsWith(i.href))
+      .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  })();
+  const isActive = (item: (typeof NAV)[number]) => item.href === activeHref;
 
   const initials = (profile?.fullName || user?.name || user?.email || 'S')
     .split(' ')
