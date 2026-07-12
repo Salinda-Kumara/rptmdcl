@@ -49,3 +49,8 @@ out/
 # Docker
 docker-compose.override.yml
 ~$*
+
+# Student data spreadsheets (never commit personal data)
+StData.xlsx
+/*.xls
+/*.xlsx
