@@ -25,6 +25,7 @@ export interface StaffApplication extends Application {
   student?: {
     id: string;
     fullName: string;
+    nameWithInitials?: string | null;
     batchNumber: string;
     registrationNumber: string;
     nic: string;
@@ -43,6 +44,8 @@ export interface AdmissionExam {
   session2?: string | null;
   session3?: string | null;
   location?: string | null;
+  intake?: string | null;
+  schedule?: { startDate?: string | null; endDate?: string | null } | null;
 }
 
 export const staffApi = {

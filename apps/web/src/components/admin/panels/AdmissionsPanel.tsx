@@ -1,10 +1,30 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { GraduationCap, Search, Printer, Loader2, Inbox, ChevronRight, X } from 'lucide-react';
+import { GraduationCap, Search, Printer, Loader2, Inbox, ChevronRight, X, FileSpreadsheet } from 'lucide-react';
 import { staffApi, StaffApplication, AdmissionExam } from '@/lib/staff-api';
 import { printAdmissionCard } from '@/lib/admission-card-pdf';
+import { exportAttendanceSheet } from '@/lib/export-attendance';
 import { useMyPermissions } from '@/lib/permissions';
+
+// "Mohamed Zarook Fathima Zamnath Sahma" → "M. Z. F. Z. Sahma".
+const toInitials = (nameWith?: string | null, full?: string | null) => {
+  if (nameWith && nameWith.trim()) return nameWith.trim();
+  const parts = (full ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return full ?? '';
+  const last = parts.pop() as string;
+  return `${parts.map((p) => p.charAt(0).toUpperCase() + '.').join(' ')} ${last}`;
+};
+
+const ordinal = (n: number) => {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+const longDate = (d?: string | null) => {
+  if (!d) return '';
+  const dt = new Date(d);
+  return `${ordinal(dt.getUTCDate())} ${dt.toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' })} ${dt.getUTCFullYear()}`;
+};
 
 const normCode = (c?: string | null) => (c ?? '').toUpperCase().replace(/\s+/g, '');
 const fmtDate = (d?: string | null) =>
@@ -18,7 +38,9 @@ export function AdmissionsPanel() {
   const [search, setSearch] = useState('');
   const [fDate, setFDate] = useState('');
   const [fSubject, setFSubject] = useState('');
+  const [hidePrinted, setHidePrinted] = useState(false);
   const [printing, setPrinting] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -56,6 +78,7 @@ export function AdmissionsPanel() {
   // A subject passes the Exam-Date filter and the typed Subject filter
   // (matches subject code or name, case-insensitive).
   const subjectMatches = (s: any) => {
+    if (hidePrinted && s.admissionPrinted) return false;
     const q = fSubject.trim().toLowerCase();
     const code = (s.subject?.code ?? '').toLowerCase();
     const name = (s.subject?.name ?? '').toLowerCase();
@@ -70,7 +93,7 @@ export function AdmissionsPanel() {
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
     return apps.filter((a) => {
-      if ((fDate || fSubject) && visibleSubs(a).length === 0) return false;
+      if ((fDate || fSubject || hidePrinted) && visibleSubs(a).length === 0) return false;
       if (!q) return true;
       return (
         (a.student?.fullName ?? '').toLowerCase().includes(q) ||
@@ -81,10 +104,68 @@ export function AdmissionsPanel() {
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apps, search, fDate, fSubject, examByCode]);
+  }, [apps, search, fDate, fSubject, hidePrinted, examByCode]);
 
   const toggle = (id: string) =>
     setExpanded((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  // Distinct subjects across the filtered results, each with its candidates.
+  // Attendance export requires the filter to resolve to exactly one subject.
+  const exportGroups = useMemo(() => {
+    const m = new Map<string, { code: string; name: string; candidates: { regNo: string; name: string; nic: string }[] }>();
+    for (const a of list) {
+      for (const s of (a.applicationSubjects ?? []).filter(subjectMatches)) {
+        const code = s.subject?.code ?? '';
+        if (!m.has(code)) m.set(code, { code, name: s.subject?.name ?? '', candidates: [] });
+        m.get(code)!.candidates.push({
+          regNo: a.student?.registrationNumber ?? '',
+          name: toInitials(a.student?.nameWithInitials, a.student?.fullName),
+          nic: a.student?.nic ?? '',
+        });
+      }
+    }
+    return [...m.values()];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list, fDate, fSubject, hidePrinted, examByCode]);
+
+  const canExport = exportGroups.length === 1;
+
+  const doExportAttendance = async () => {
+    if (!canExport) return;
+    const g = exportGroups[0];
+    const e = examByCode.get(normCode(g.code));
+    setExporting(true);
+    try {
+      const prog = normCode(g.code).startsWith('BMBA')
+        ? 'B.Mgt (Business Analytics) General / Special Degree Programme'
+        : 'BSc. (Applied Accounting) General/Special Degree Programme';
+      const eff = e?.revisedDate || e?.examDate || null;
+      const monthName = (d: string) => new Date(d).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
+      // Exam period = the schedule's month span (e.g. "June/July 2026"); falls
+      // back to the exam's own month.
+      let period = eff ? `${monthName(eff)} ${new Date(eff).getUTCFullYear()}` : '';
+      if (e?.schedule?.startDate && e?.schedule?.endDate) {
+        const s = e.schedule.startDate, en = e.schedule.endDate;
+        const sm = monthName(s), em = monthName(en), yr = new Date(en).getUTCFullYear();
+        period = sm === em ? `${sm} ${yr}` : `${sm}/${em} ${yr}`;
+      }
+      const time = (e?.session1 || e?.session2 || e?.session3 || '').toString();
+      const dateLine = [longDate(eff), time, e?.location ? `Location : ${e.location}` : ''].filter(Boolean).join('     ');
+      await exportAttendanceSheet({
+        programmeTitle: prog,
+        examPeriod: period,
+        intake: e?.intake ?? '',
+        courseLine: `${g.code} ${g.name}`.trim(),
+        dateLine,
+        candidates: g.candidates,
+        fileName: `attendance-${normCode(g.code)}${eff ? '-' + eff.slice(0, 10) : ''}.xlsx`,
+      });
+    } catch (err) {
+      console.error('Attendance export failed', err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const doPrint = async (app: StaffApplication, subId: string) => {
     if (printing) return;
@@ -140,6 +221,15 @@ export function AdmissionsPanel() {
               Clear date
             </button>
           )}
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={hidePrinted}
+              onChange={(e) => setHidePrinted(e.target.checked)}
+              className="h-4 w-4 accent-emerald-600"
+            />
+            Hide printed
+          </label>
           <div className="relative">
             <input
               value={fSubject}
@@ -170,6 +260,15 @@ export function AdmissionsPanel() {
               className="w-56 rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             />
           </div>
+          <button
+            onClick={doExportAttendance}
+            disabled={!canExport || exporting}
+            title={canExport ? 'Export attendance sheet for the filtered subject' : 'Filter to a single subject (and date) to export its attendance sheet'}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            Export Attendance
+          </button>
         </div>
       </div>
 

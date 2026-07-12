@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -32,6 +33,55 @@ const DOC_LABELS: Record<string, string> = {
 export class ApplicationsService {
   constructor(private prisma: PrismaService) {}
 
+  // Live applications that still "occupy" a subject/date. Draft (provisional),
+  // rejected and cancelled ones don't block — the student may apply again.
+  private static readonly ACTIVE_STATUSES = ['SUBMITTED', 'PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'APPROVED'];
+
+  /**
+   * Block applying for the same subject on the same exam date more than once.
+   * Considers the student's active (non-rejected/cancelled) applications,
+   * excluding `ignoreApplicationId` (e.g. the draft being submitted).
+   */
+  private async assertNoDuplicateSubjects(
+    studentId: string,
+    subjects: { subjectId: string; upcomingExamDate?: string | Date | null }[],
+    ignoreApplicationId?: string,
+  ) {
+    const dayOf = (d?: string | Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+
+    // Duplicates within the same submission.
+    const seen = new Set<string>();
+    for (const s of subjects) {
+      const k = `${s.subjectId}::${dayOf(s.upcomingExamDate)}`;
+      if (seen.has(k)) throw new ConflictException('The same subject cannot be added twice for the same exam date.');
+      seen.add(k);
+    }
+
+    const existing = await this.prisma.applicationSubject.findMany({
+      where: {
+        subjectId: { in: subjects.map((s) => s.subjectId) },
+        application: {
+          studentId,
+          deletedAt: null,
+          status: { in: ApplicationsService.ACTIVE_STATUSES },
+          ...(ignoreApplicationId ? { id: { not: ignoreApplicationId } } : {}),
+        },
+      },
+      include: { subject: { select: { code: true, name: true } } },
+    });
+
+    const clash: string[] = [];
+    for (const s of subjects) {
+      const dup = existing.find((e) => e.subjectId === s.subjectId && dayOf(e.upcomingExamDate) === dayOf(s.upcomingExamDate));
+      if (dup) clash.push(dup.subject?.code ?? s.subjectId);
+    }
+    if (clash.length) {
+      throw new ConflictException(
+        `You have already applied for ${clash.join(', ')} on the same exam date. You can re-apply only if the earlier application was rejected.`,
+      );
+    }
+  }
+
   async create(userId: string, dto: CreateApplicationDto) {
     const student = await this.prisma.student.findFirst({ where: { userId } });
     if (!student) throw new NotFoundException('Student not found');
@@ -39,6 +89,8 @@ export class ApplicationsService {
     if (dto.subjects.length === 0) {
       throw new BadRequestException('At least one subject is required');
     }
+
+    await this.assertNoDuplicateSubjects(student.id, dto.subjects);
 
     const feePerSubject = dto.type === 'REPEAT' ? REPEAT_FEE_PER_SUBJECT : MEDICAL_FEE_PER_SUBJECT;
     const totalFee = dto.subjects.length * feePerSubject;
@@ -157,6 +209,14 @@ export class ApplicationsService {
     if (application.status !== 'DRAFT') {
       throw new BadRequestException('Only DRAFT applications can be submitted');
     }
+
+    // Re-check duplicates at submit (a live application may have appeared since
+    // this draft was created). Ignore this draft itself.
+    const draftSubjects = await this.prisma.applicationSubject.findMany({
+      where: { applicationId: id },
+      select: { subjectId: true, upcomingExamDate: true },
+    });
+    await this.assertNoDuplicateSubjects(student.id, draftSubjects, id);
 
     // Enforce mandatory attachments before submission.
     const required = REQUIRED_DOCUMENTS[application.type] ?? [];
@@ -448,7 +508,8 @@ export class ApplicationsService {
       where: { schedule: { applyEnabled: true, deletedAt: null } },
       select: {
         courseCode: true, courseName: true, examDate: true, revisedDate: true,
-        session1: true, session2: true, session3: true, location: true,
+        session1: true, session2: true, session3: true, location: true, intake: true,
+        schedule: { select: { startDate: true, endDate: true } },
       },
       orderBy: { examDate: 'asc' },
     });
