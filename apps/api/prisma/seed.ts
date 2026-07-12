@@ -6,23 +6,24 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Programmes
+  // Programmes — the two active degree programmes. Student records themselves are
+  // NOT seeded; they are imported from Excel via the admin Students screen.
   const accountingProgramme = await prisma.programme.upsert({
-    where: { code: 'AA' },
-    update: {},
+    where: { code: 'BSAA' },
+    update: { name: 'BSc in Applied Accounting' },
     create: {
-      code: 'AA',
-      name: 'BSc Applied Accounting',
-      description: 'Bachelor of Science in Applied Accounting',
+      code: 'BSAA',
+      name: 'BSc in Applied Accounting',
+      description: 'Bachelor of Science (Honours) in Applied Accounting',
     },
   });
 
-  const bmbaProgram = await prisma.programme.upsert({
+  await prisma.programme.upsert({
     where: { code: 'BMBA' },
-    update: {},
+    update: { name: 'B.Mgt. in Business Analytics' },
     create: {
       code: 'BMBA',
-      name: 'Bachelor of Management in Business Analytics',
+      name: 'B.Mgt. in Business Analytics',
       description: 'Bachelor of Management in Business Analytics',
     },
   });
@@ -39,109 +40,69 @@ async function main() {
 
   // Subjects
 
+  // BSc in Applied Accounting — Curriculum 2020. Codes keep the space (e.g.
+  // "BSAA 11013") to match the printed curriculum and exam-schedule course codes.
   const subjectData = [
-    { code: 'BSAA11013', name: 'Financial Accounting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA11023', name: 'Management Fundamentals', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA11032', name: 'Principles of Economics', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA11043', name: 'Financial Mathematics', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA11052', name: 'Business Law', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA11062', name: 'Business Communication & Skill Development I', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA12013', name: 'Information Technology in Business', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA12023', name: 'Cost & Management Accounting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA12033', name: 'Marketing Management', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA12042', name: 'Business Economics', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA12052', name: 'Business Statistics & Forecasting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA12062', name: 'Business Taxation', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA21013', name: 'Financial Reporting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA21023', name: 'Business Processes, Controls & Audits', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA21032', name: 'Human Resource Management', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA21042', name: 'Management Information Systems', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA21053', name: 'Business Finance', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA21062', name: 'Business Communication & Skill Development II', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA22013', name: 'Accounting in Digital Environment', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA22023', name: 'Advanced Management Accounting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA22033', name: 'Audit & Assurance', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA22043', name: 'Operations Management', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA22053', name: 'Corporate Law', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA31013', name: 'Corporate Reporting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA31023', name: 'Digital Business Strategy', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA31033', name: 'Research Methodology', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA31044', name: 'Internship in Accounting I', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA31052', name: 'Skills in Leadership & Innovation', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA32013', name: 'Governance, Ethics and Risk Management', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA32024', name: 'Corporate Taxation', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA32034', name: 'Package Based Data Analysis', category: 'Elective', programmeId: accountingProgramme.id },
-    { code: 'BSAA32044', name: 'Business Research Project', category: 'Elective', programmeId: accountingProgramme.id },
-    { code: 'BSAA32054', name: 'Internship in Accounting II', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA41012', name: 'Entrepreneurship', category: 'Elective', programmeId: accountingProgramme.id },
-    { code: 'BSAA41022', name: 'International Business', category: 'Elective', programmeId: accountingProgramme.id },
-    { code: 'BSAA41032', name: 'Organizational Behaviour', category: 'Elective', programmeId: accountingProgramme.id },
-    { code: 'BSAA41043', name: 'Corporate Finance & Risk Management', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA41054', name: 'Internship in Accounting III', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA41063', name: 'Business Intelligence', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA41073', name: 'Business Analytics', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA41083', name: 'Information Security & Fraud Analytics', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA41093', name: 'Forensic Accounting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA41103', name: 'Security Analysis & Business Valuation', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA41113', name: 'Financial Modeling & Forecasting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA42012', name: 'Contemporary Issues in Accounting', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA42023', name: 'Strategic Management', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA42036', name: 'Dissertation', category: 'Core', programmeId: accountingProgramme.id },
-    { code: 'BSAA42044', name: 'Internship in Accounting IV', category: 'Core', programmeId: accountingProgramme.id },
+    { code: 'BSAA 11013', name: 'Financial Accounting', category: 'Core' },
+    { code: 'BSAA 11023', name: 'Management Fundamentals', category: 'Core' },
+    { code: 'BSAA 11032', name: 'Principles of Economics', category: 'Core' },
+    { code: 'BSAA 11043', name: 'Financial Mathematics', category: 'Core' },
+    { code: 'BSAA 11052', name: 'Business Law', category: 'Core' },
+    { code: 'BSAA 11062', name: 'Business Communication & Skill Development I', category: 'Core' },
+    { code: 'BSAA 12013', name: 'Information Technology in Business', category: 'Core' },
+    { code: 'BSAA 12023', name: 'Cost & Management Accounting', category: 'Core' },
+    { code: 'BSAA 12033', name: 'Marketing Management', category: 'Core' },
+    { code: 'BSAA 12042', name: 'Business Economics', category: 'Core' },
+    { code: 'BSAA 12052', name: 'Business Statistics & Forecasting', category: 'Core' },
+    { code: 'BSAA 12062', name: 'Business Taxation', category: 'Core' },
+    { code: 'BSAA 21013', name: 'Financial Reporting', category: 'Core' },
+    { code: 'BSAA 21023', name: 'Business Processes, Controls & Audits', category: 'Core' },
+    { code: 'BSAA 21032', name: 'Human Resource Management', category: 'Core' },
+    { code: 'BSAA 21042', name: 'Management Information Systems', category: 'Core' },
+    { code: 'BSAA 21053', name: 'Business Finance', category: 'Core' },
+    { code: 'BSAA 21062', name: 'Business Communication & Skill Development II', category: 'Core' },
+    { code: 'BSAA 22013', name: 'Accounting in Digital Environment', category: 'Core' },
+    { code: 'BSAA 22023', name: 'Advanced Management Accounting', category: 'Core' },
+    { code: 'BSAA 22033', name: 'Audit & Assurance', category: 'Core' },
+    { code: 'BSAA 22043', name: 'Operations Management', category: 'Core' },
+    { code: 'BSAA 22053', name: 'Corporate Law', category: 'Core' },
+    { code: 'BSAA 31013', name: 'Corporate Reporting', category: 'Core' },
+    { code: 'BSAA 31023', name: 'Digital Business Strategy', category: 'Core' },
+    { code: 'BSAA 31033', name: 'Research Methodology', category: 'Core' },
+    { code: 'BSAA 31044', name: 'Internship in Accounting I', category: 'Core' },
+    { code: 'BSAA 31052', name: 'Skills in Leadership & Innovation', category: 'Core' },
+    { code: 'BSAA 32013', name: 'Governance, Ethics and Risk Management', category: 'Core' },
+    { code: 'BSAA 32024', name: 'Corporate Taxation', category: 'Core' },
+    { code: 'BSAA 32034', name: 'Package Based Data Analysis', category: 'Elective' },
+    { code: 'BSAA 32044', name: 'Business Research Project', category: 'Elective' },
+    { code: 'BSAA 32054', name: 'Internship in Accounting II', category: 'Core' },
+    { code: 'BSAA 41012', name: 'Entrepreneurship', category: 'Elective' },
+    { code: 'BSAA 41022', name: 'International Business', category: 'Elective' },
+    { code: 'BSAA 41032', name: 'Organizational Behaviour', category: 'Elective' },
+    { code: 'BSAA 41043', name: 'Corporate Finance & Risk Management', category: 'Core' },
+    { code: 'BSAA 41054', name: 'Internship in Accounting III', category: 'Core' },
+    { code: 'BSAA 41063', name: 'Business Intelligence', category: 'Core' },
+    { code: 'BSAA 41073', name: 'Business Analytics', category: 'Core' },
+    { code: 'BSAA 41083', name: 'Information Security & Fraud Analytics', category: 'Core' },
+    { code: 'BSAA 41093', name: 'Forensic Accounting', category: 'Core' },
+    { code: 'BSAA 41103', name: 'Security Analysis & Business Valuation', category: 'Core' },
+    { code: 'BSAA 41113', name: 'Financial Modeling & Forecasting', category: 'Core' },
+    { code: 'BSAA 42012', name: 'Contemporary Issues in Accounting', category: 'Core' },
+    { code: 'BSAA 42023', name: 'Strategic Management', category: 'Core' },
+    { code: 'BSAA 42036', name: 'Dissertation', category: 'Core' },
+    { code: 'BSAA 42044', name: 'Internship in Accounting IV', category: 'Core' },
   ];
 
   for (const s of subjectData) {
     await prisma.subject.upsert({
-      where: { code_programmeId: { code: s.code, programmeId: s.programmeId } },
-      update: {},
-      create: s,
+      where: { code_programmeId: { code: s.code, programmeId: accountingProgramme.id } },
+      update: { name: s.name, category: s.category },
+      create: { code: s.code, name: s.name, category: s.category, programmeId: accountingProgramme.id },
     });
   }
 
-  // Batches
-  await prisma.batch.upsert({
-    where: { batchNumber_intake: { batchNumber: 'AA22-105', intake: '2022-01' } },
-    update: {},
-    create: { batchNumber: 'AA22-105', programmeId: accountingProgramme.id, intake: '2022-01' },
-  });
-
-  await prisma.batch.upsert({
-    where: { batchNumber_intake: { batchNumber: 'AA23-201', intake: '2023-01' } },
-    update: {},
-    create: { batchNumber: 'AA23-201', programmeId: accountingProgramme.id, intake: '2023-01' },
-  });
-
-  await prisma.batch.upsert({
-    where: { batchNumber_intake: { batchNumber: 'BMBA23-001', intake: '2023-01' } },
-    update: {},
-    create: { batchNumber: 'BMBA23-001', programmeId: bmbaProgram.id, intake: '2023-01' },
-  });
-
-  // Student user
-  const studentUser = await prisma.user.upsert({
-    where: { email: 'student@example.com' },
-    update: {},
-    create: { email: 'student@example.com', password: null },
-  });
-
-  await prisma.student.upsert({
-    where: { registrationNumber: 'AA22-105-001' },
-    update: {},
-    create: {
-      batchNumber: 'AA22-105',
-      nic: '200012345678',
-      fullName: 'JOHN DOE',
-      nameWithInitials: 'J. Doe',
-      permanentAddress: '123 Main Street, Colombo 07',
-      postalAddress: '123 Main Street, Colombo 07',
-      telephone: '0112345678',
-      mobile: '0712345678',
-      email: 'john@example.com',
-      registrationNumber: 'AA22-105-001',
-      intake: '2022-01',
-      userId: studentUser.id,
-    },
-  });
+  // NOTE: Students and batches are NOT seeded — they are imported from Excel via
+  // the admin Students screen (which derives batches from the reg numbers).
 
   const password = await argon2.hash('password123');
 
@@ -209,9 +170,8 @@ async function main() {
     create: { userId: adminUser.id, name: 'Master Admin', position: 'Administrator' },
   });
 
-  console.log('✅ Seed completed!\n');
-  console.log('📝 Test Credentials:');
-  console.log('  Student - Batch: AA22-105  NIC: 200012345678');
+  console.log('✅ Seed completed! (programmes + subjects; students are imported via Excel)\n');
+  console.log('📝 Staff Credentials:');
   console.log('  Finance Officer - Email: finance@example.com  Password: password123');
   console.log('  Verification Officer - Email: verification@example.com  Password: password123');
   console.log('  Exam Manager - Email: exammanager@example.com  Password: password123');
