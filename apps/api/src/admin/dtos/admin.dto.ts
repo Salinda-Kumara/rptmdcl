@@ -56,6 +56,10 @@ export class CreateStaffUserDto {
 
 export class UpdateStaffUserDto {
   @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
   @IsString()
   name?: string;
 

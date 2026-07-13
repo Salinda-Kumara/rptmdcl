@@ -43,13 +43,14 @@ export function UsersPanel() {
 
   const save = async () => {
     setError('');
-    if (!editing && (!email.trim() || !password.trim())) { setError('Email and password are required'); return; }
+    if (!email.trim()) { setError('Email is required'); return; }
+    if (!editing && !password.trim()) { setError('Email and password are required'); return; }
     if (!name.trim() || !position.trim()) { setError('Name and position are required'); return; }
     const permissions = grantsFromMatrix();
     if (!isAdmin && permissions.length === 0) { setError('Grant at least one permission, or mark as Master Admin'); return; }
     setSaving(true);
     try {
-      if (editing) await adminApi.updateUser(editing.id, { name, position, isAdmin, permissions, ...(password ? { password } : {}) });
+      if (editing) await adminApi.updateUser(editing.id, { email: email.trim(), name, position, isAdmin, permissions, ...(password ? { password } : {}) });
       else await adminApi.createUser({ email, password, name, position, isAdmin, permissions });
       setModalOpen(false); load();
     } catch (e: any) { setError(e.response?.data?.message?.toString() || 'Save failed'); }

@@ -145,6 +145,14 @@ export class AdminService {
 
     const ops: any[] = [];
 
+    if (dto.email !== undefined && dto.email !== user.email) {
+      const clash = await this.prisma.user.findFirst({
+        where: { email: dto.email, id: { not: id }, deletedAt: null },
+      });
+      if (clash) throw new ConflictException('A user with this email already exists');
+      ops.push(this.prisma.user.update({ where: { id }, data: { email: dto.email } }));
+    }
+
     if (dto.name !== undefined || dto.position !== undefined) {
       ops.push(
         this.prisma.staffUser.update({

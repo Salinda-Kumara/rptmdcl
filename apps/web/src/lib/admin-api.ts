@@ -156,7 +156,7 @@ export const adminApi = {
   listUsers: () => apiClient.get<AdminUser[]>('/admin/users').then((r) => r.data),
   createUser: (data: { email: string; password: string; name: string; position: string; isAdmin?: boolean; permissions?: PermissionGrant[] }) =>
     apiClient.post<AdminUser>('/admin/users', data).then((r) => r.data),
-  updateUser: (id: string, data: { name?: string; position?: string; password?: string; isAdmin?: boolean; permissions?: PermissionGrant[] }) =>
+  updateUser: (id: string, data: { email?: string; name?: string; position?: string; password?: string; isAdmin?: boolean; permissions?: PermissionGrant[] }) =>
     apiClient.patch<AdminUser>(`/admin/users/${id}`, data).then((r) => r.data),
   deactivateUser: (id: string) => apiClient.delete(`/admin/users/${id}`).then((r) => r.data),
   activateUser: (id: string) => apiClient.patch(`/admin/users/${id}/activate`).then((r) => r.data),
