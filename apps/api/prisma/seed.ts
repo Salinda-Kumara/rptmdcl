@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { juneJulySchedule } from './seed-data/june-july-schedule';
 
 const prisma = new PrismaClient();
 
@@ -209,6 +210,50 @@ async function main() {
   for (const p of examStaff) {
     const existing = await prisma.examStaff.findFirst({ where: { name: p.name, role: p.role, deletedAt: null } });
     if (!existing) await prisma.examStaff.create({ data: { name: p.name, role: p.role } });
+  }
+
+  // June/July 2026 ESE schedule with its 39 exam rows (idempotent by name).
+  const existingSchedule = await prisma.examinationSchedule.findFirst({
+    where: { name: juneJulySchedule.name, deletedAt: null },
+  });
+  if (!existingSchedule) {
+    const staffRows = await prisma.examStaff.findMany({ where: { deletedAt: null } });
+    const staffId = new Map(staffRows.map((s) => [`${s.role}::${s.name.trim().toLowerCase()}`, s.id]));
+    const resolve = (names: string[], role: string) =>
+      names.map((n) => staffId.get(`${role}::${n.trim().toLowerCase()}`)).filter(Boolean) as string[];
+
+    const schedule = await prisma.examinationSchedule.create({
+      data: {
+        name: juneJulySchedule.name,
+        startDate: new Date(juneJulySchedule.startDate),
+        endDate: new Date(juneJulySchedule.endDate),
+      },
+    });
+    for (const e of juneJulySchedule.exams) {
+      await prisma.scheduledExam.create({
+        data: {
+          scheduleId: schedule.id,
+          orderIndex: e.orderIndex,
+          serialCode: e.serialCode,
+          startAtLabel: e.startAtLabel,
+          examDate: e.examDate ? new Date(e.examDate) : null,
+          weekday: e.weekday,
+          revisedDate: e.revisedDate ? new Date(e.revisedDate) : null,
+          intake: e.intake,
+          courseCode: e.courseCode,
+          courseName: e.courseName,
+          expectedCount: e.expectedCount,
+          session1: e.session1,
+          session2: e.session2,
+          session3: e.session3,
+          location: e.location,
+          chiefExaminerIds: resolve(e.chiefExaminers, 'EXAMINER'),
+          supervisorIds: resolve(e.supervisors, 'SUPERVISOR'),
+          invigilatorIds: resolve(e.invigilators, 'INVIGILATOR'),
+          supportingIds: resolve(e.supporting, 'SUPPORTING'),
+        },
+      });
+    }
   }
 
   // NOTE: Students and batches are NOT seeded — they are imported from Excel via
