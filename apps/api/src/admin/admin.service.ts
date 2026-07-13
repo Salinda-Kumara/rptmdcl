@@ -784,27 +784,13 @@ export class AdminService {
     // Student.batchNumber+intake is a composite FK to Batch, so the referenced
     // Batch rows must exist first. We derive a programme from the registration
     // prefix and ensure a Batch per distinct (batchNumber, intake).
-    const PROG_NAMES: Record<string, string> = {
-      BAA: 'BSc Applied Accounting',
-      BMBA: 'Bachelor of Management (Business Analytics)',
-      BSC: 'BSc Degree',
-      SAB: 'SAB (Legacy)',
-      SPE: 'Special Programme',
-      GEN: 'General Programme',
-      OTHER: 'Other / Legacy',
-    };
-    const prefixOf = (reg: string) => {
-      const segs = reg.split('/');
-      return segs.length > 1 ? segs[0].toUpperCase() : 'OTHER';
-    };
-
-    // 1. Ensure a programme per distinct prefix.
+    // 1. Ensure a programme per distinct canonical code (BSc → BSAA via alias).
     const progIdByCode = new Map<string, string>();
-    for (const code of new Set(unique.map((s) => prefixOf(s.registrationNumber)))) {
+    for (const code of new Set(unique.map((s) => programmeCodeOf(s.registrationNumber)))) {
       const prog = await this.prisma.programme.upsert({
         where: { code },
         update: {},
-        create: { code, name: PROG_NAMES[code] || code },
+        create: { code, name: PROGRAMME_NAMES[code] || code },
       });
       progIdByCode.set(code, prog.id);
     }
@@ -813,7 +799,7 @@ export class AdminService {
     const batchProg = new Map<string, string>(); // "batchNumber intake" -> programmeId
     for (const s of unique) {
       const key = `${s.batchNumber} ${s.intake}`;
-      if (!batchProg.has(key)) batchProg.set(key, progIdByCode.get(prefixOf(s.registrationNumber))!);
+      if (!batchProg.has(key)) batchProg.set(key, progIdByCode.get(programmeCodeOf(s.registrationNumber))!);
     }
     const batchEntries = Array.from(batchProg.entries());
     for (let i = 0; i < batchEntries.length; i += 100) {
