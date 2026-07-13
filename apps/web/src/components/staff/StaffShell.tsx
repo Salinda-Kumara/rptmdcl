@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileText, CalendarDays, GraduationCap,
   BarChart3, LogOut, ShieldCheck, Menu, X, Crown,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
@@ -52,6 +53,11 @@ export function StaffShell() {
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Remember the collapsed state across sessions.
+  useEffect(() => { if (localStorage.getItem('staffSidebarCollapsed') === '1') setCollapsed(true); }, []);
+  const applyCollapsed = (n: boolean) => { setCollapsed(n); localStorage.setItem('staffSidebarCollapsed', n ? '1' : '0'); };
 
   const navigate = (v: string, id?: string) => {
     setView(v as View);
@@ -72,16 +78,29 @@ export function StaffShell() {
   const initials = displayName.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
   const activeView = view === 'app-detail' ? 'applications' : view === 'schedule-detail' ? 'schedules' : view;
 
-  const SidebarContent = () => (
+  const SidebarContent = ({ mini = false }: { mini?: boolean }) => (
     <>
-      <div className="flex items-center gap-2.5 px-6 h-16 border-b border-indigo-800/50">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-violet-500 shadow-lg">
-          <ShieldCheck className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <p className="text-sm font-bold text-white leading-none">ERMAS</p>
-          <p className="text-[10px] text-indigo-300 mt-0.5">Staff Portal</p>
-        </div>
+      <div className={`flex h-16 items-center border-b border-indigo-800/50 ${mini ? 'justify-center px-0' : 'gap-2.5 px-6'}`}>
+        {mini ? (
+          <button onClick={() => applyCollapsed(false)} title="Expand menu"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-indigo-300 hover:bg-indigo-800/60 hover:text-white">
+            <PanelLeftOpen className="h-5 w-5" />
+          </button>
+        ) : (
+          <>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-violet-500 shadow-lg">
+              <ShieldCheck className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-white leading-none">ERMAS</p>
+              <p className="text-[10px] text-indigo-300 mt-0.5">Staff Portal</p>
+            </div>
+            <button onClick={() => applyCollapsed(true)} title="Collapse menu"
+              className="hidden rounded-lg p-1.5 text-indigo-300 hover:bg-indigo-800/60 hover:text-white lg:block">
+              <PanelLeftClose className="h-5 w-5" />
+            </button>
+          </>
+        )}
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
@@ -92,37 +111,55 @@ export function StaffShell() {
             <button
               key={item.view}
               onClick={() => navigate(item.view)}
-              className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all text-left ${
+              title={mini ? item.label : undefined}
+              className={`group flex w-full items-center rounded-lg py-2.5 text-sm font-medium transition-all text-left ${
+                mini ? 'justify-center px-0' : 'gap-3 px-3'
+              } ${
                 active
                   ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-md'
                   : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
               }`}
             >
-              <Icon className={`h-[18px] w-[18px] ${active ? 'text-white' : 'text-indigo-300 group-hover:text-white'}`} />
-              {item.label}
+              <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-white' : 'text-indigo-300 group-hover:text-white'}`} />
+              {!mini && item.label}
             </button>
           );
         })}
       </nav>
 
       <div className="border-t border-indigo-800/50 p-3">
-        <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-700 text-xs font-semibold text-white">
-            {initials}
+        {mini ? (
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-700 text-xs font-semibold text-white" title={displayName}>
+              {initials}
+            </div>
+            <ThemeToggle compact />
+            <button onClick={logout} title="Sign out"
+              className="rounded-lg p-2 text-indigo-200 transition-colors hover:bg-red-500/10 hover:text-red-300">
+              <LogOut className="h-[18px] w-[18px]" />
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">{displayName}</p>
-            <p className="truncate text-[11px] text-indigo-300">{isAdmin ? 'Master Admin' : 'Staff'}</p>
-          </div>
-        </div>
-        <ThemeToggle />
-        <button
-          onClick={logout}
-          className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-indigo-200 transition-colors hover:bg-red-500/10 hover:text-red-300"
-        >
-          <LogOut className="h-[18px] w-[18px]" />
-          Sign out
-        </button>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 rounded-lg px-2 py-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-700 text-xs font-semibold text-white">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-white">{displayName}</p>
+                <p className="truncate text-[11px] text-indigo-300">{isAdmin ? 'Master Admin' : 'Staff'}</p>
+              </div>
+            </div>
+            <ThemeToggle />
+            <button
+              onClick={logout}
+              className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-indigo-200 transition-colors hover:bg-red-500/10 hover:text-red-300"
+            >
+              <LogOut className="h-[18px] w-[18px]" />
+              Sign out
+            </button>
+          </>
+        )}
       </div>
     </>
   );
@@ -130,8 +167,8 @@ export function StaffShell() {
   return (
     <ProtectedLayout>
       <div className="min-h-screen bg-slate-50 dark:bg-gray-950">
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-indigo-950 lg:flex">
-          <SidebarContent />
+        <aside className={`fixed inset-y-0 left-0 z-40 hidden flex-col bg-indigo-950 transition-[width] duration-200 lg:flex ${collapsed ? 'w-16' : 'w-64'}`}>
+          <SidebarContent mini={collapsed} />
         </aside>
 
         {mobileOpen && (
@@ -141,12 +178,12 @@ export function StaffShell() {
               <button onClick={() => setMobileOpen(false)} className="absolute right-3 top-4 text-indigo-300 hover:text-white">
                 <X className="h-5 w-5" />
               </button>
-              <SidebarContent />
+              <SidebarContent mini={false} />
             </aside>
           </div>
         )}
 
-        <div className="lg:pl-64">
+        <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
           <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 lg:hidden">
             <button onClick={() => setMobileOpen(true)} className="text-slate-600 dark:text-gray-400">
               <Menu className="h-6 w-6" />
