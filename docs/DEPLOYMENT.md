@@ -47,15 +47,48 @@ docker compose -f docker-compose.deploy.yml up -d --build
 
 ### 4. Initialize the Database (First-Time Only)
 
-When starting the application for the very first time, the database will be empty. You need to push the Prisma schema to create the tables, and then run the seed script to populate initial data (like roles and admin users).
+When starting the application for the very first time, the database will be empty. You need to push the Prisma schema to create the tables, create the separate logs database, and then run the seed script to populate initial data.
 
 ```bash
-# Push the schema to create database tables
+# Push the schema to create database tables (main DB)
 docker compose -f docker-compose.deploy.yml exec api npx prisma db push
 
-# Seed the database
+# Create the SEPARATE activity-logs database (the app auto-creates its table on start).
+# Use the POSTGRES_USER from your .env (default: ermas).
+docker compose -f docker-compose.deploy.yml exec postgres \
+  psql -U ermas -c "CREATE DATABASE ermas_logs;"
+docker compose -f docker-compose.deploy.yml restart api
+
+# Seed programmes, subjects and the exam-staff directory
 docker compose -f docker-compose.deploy.yml exec api node dist/prisma/seed.js
 ```
+
+> **Note:** Students and batches are **not** seeded — import them from Excel via the
+> admin **Students** screen. If you skip the `ermas_logs` step the app still runs;
+> the Activity Logs feature is simply disabled (with a warning in the API logs).
+
+### 4b. Deploying Updates (pulling new code)
+
+To roll out a new version after the initial setup:
+
+```bash
+cd ermas
+git pull
+
+# Rebuild and restart the containers with the new code
+docker compose -f docker-compose.deploy.yml up -d --build
+
+# Sync any schema changes (new columns/tables) into the database
+docker compose -f docker-compose.deploy.yml exec api npx prisma db push
+
+# (Optional) re-run the seed to add any new programmes/subjects/exam staff.
+# It is idempotent, BUT it resets the four staff-account passwords to the seed
+# default — re-set them afterwards if you have changed them in production.
+docker compose -f docker-compose.deploy.yml exec api node dist/prisma/seed.js
+```
+
+If `prisma db push` warns about potential data loss on a change you expect and
+have reviewed, re-run it with `--accept-data-loss`.
 
 ### 5. Access the Application
 
@@ -86,5 +119,7 @@ docker compose -f docker-compose.deploy.yml up -d --build
 docker compose -f docker-compose.deploy.yml down -v
 docker compose -f docker-compose.deploy.yml up -d --build
 docker compose -f docker-compose.deploy.yml exec api npx prisma db push
+docker compose -f docker-compose.deploy.yml exec postgres psql -U ermas -c "CREATE DATABASE ermas_logs;"
+docker compose -f docker-compose.deploy.yml restart api
 docker compose -f docker-compose.deploy.yml exec api node dist/prisma/seed.js
 ```
