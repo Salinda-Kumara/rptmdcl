@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileText, CalendarDays, GraduationCap,
-  BarChart3, LogOut, ShieldCheck, Menu, X, Crown,
+  BarChart3, LogOut, ShieldCheck, Menu, X, Crown, UserSquare2,
   PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
@@ -16,9 +16,10 @@ import { ReportsPanel } from '@/components/admin/panels/ReportsPanel';
 import { ExamSchedulesPanel } from '@/components/admin/panels/ExamSchedulesPanel';
 import { ScheduleDetailPanel } from '@/components/admin/panels/ScheduleDetailPanel';
 import { AdmissionsPanel } from '@/components/admin/panels/AdmissionsPanel';
+import { StudentsPanel } from '@/components/admin/panels/StudentsPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'admissions' | 'reports' | 'admin';
+type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'admissions' | 'students' | 'reports' | 'admin';
 
 interface NavItem {
   view: View;
@@ -33,6 +34,7 @@ const NAV: NavItem[] = [
   { view: 'applications', label: 'Applications',  icon: FileText,      resource: 'applications' },
   { view: 'schedules',    label: 'Schedules',     icon: CalendarDays,  resource: 'schedules' },
   { view: 'admissions',   label: 'Admissions',    icon: GraduationCap, resource: 'admissions' },
+  { view: 'students',     label: 'Students',      icon: UserSquare2,   resource: 'students' },
   { view: 'reports',      label: 'Reports',       icon: BarChart3,     resource: 'reports' },
   { view: 'admin',        label: 'Admin Console', icon: Crown,         adminOnly: true },
 ];
@@ -198,6 +200,7 @@ export function StaffShell() {
             {view === 'schedules'    && <ExamSchedulesPanel onOpen={openSchedule} />}
             {view === 'schedule-detail' && selectedScheduleId && <ScheduleDetailPanel scheduleId={selectedScheduleId} onBack={() => navigate('schedules')} />}
             {view === 'admissions'   && <AdmissionsPanel />}
+            {view === 'students'     && <StudentsPanel onNavigate={navigate} />}
             {view === 'reports'      && <ReportsPanel />}
             {view === 'admin'        && <ComingSoon label="Admin Console" />}
           </main>
