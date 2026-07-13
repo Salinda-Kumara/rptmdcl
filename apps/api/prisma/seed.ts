@@ -216,7 +216,9 @@ async function main() {
   const existingSchedule = await prisma.examinationSchedule.findFirst({
     where: { name: juneJulySchedule.name, deletedAt: null },
   });
-  if (!existingSchedule) {
+  if (existingSchedule) {
+    console.log(`↷ Exam schedule "${juneJulySchedule.name}" already exists — skipped.`);
+  } else {
     const staffRows = await prisma.examStaff.findMany({ where: { deletedAt: null } });
     const staffId = new Map(staffRows.map((s) => [`${s.role}::${s.name.trim().toLowerCase()}`, s.id]));
     const resolve = (names: string[], role: string) =>
@@ -254,6 +256,7 @@ async function main() {
         },
       });
     }
+    console.log(`✓ Seeded exam schedule "${juneJulySchedule.name}" with ${juneJulySchedule.exams.length} exam(s).`);
   }
 
   // NOTE: Students and batches are NOT seeded — they are imported from Excel via
