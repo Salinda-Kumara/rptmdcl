@@ -196,6 +196,11 @@ export async function buildApplicationFormPdf(app: StaffApplication): Promise<Ui
   // Only the table matching the application type is included.
   const isMedical = app.type === 'MEDICAL';
   const nRowsPrev = Math.max(1, subjects.length);
+  // Exam Division outcome for the Repeat table's confirmation column: rejected
+  // outright, or confirmed once the exam division forwards it past SUBMITTED.
+  const examConfirmation = app.status === 'REJECTED' ? 'Rejected'
+    : ['PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'APPROVED', 'PAYMENT_REJECTED'].includes(app.status) ? 'Confirmed'
+      : '';
 
   if (isMedical) {
     setF('bold', 8.5); text('Medical Exam ', M, y); y += 6;
@@ -209,7 +214,7 @@ export async function buildApplicationFormPdf(app: StaffApplication): Promise<Ui
     y = prevExamTable(doc, M, right, y,
       ['Course code', 'Course title', 'Date of the exam', 'Intake details', 'Grade Earned', 'Confirmation from Exam Div.'],
       [52, tableW - 52 - 68 - 58 - 52 - 82, 68, 58, 52, 82],
-      subjects.map((s) => [s.subject?.code ?? '', s.subject?.name ?? '', fmtDate(s.previousExamDate), s.previousExamIntake ?? '', s.gradeEarned ?? '', '']),
+      subjects.map((s) => [s.subject?.code ?? '', s.subject?.name ?? '', fmtDate(s.previousExamDate), s.previousExamIntake ?? '', s.gradeEarned ?? '', examConfirmation]),
       nRowsPrev);
   }
   y += 20;
