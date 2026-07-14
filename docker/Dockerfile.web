@@ -8,7 +8,8 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages ./packages
-RUN npm ci
+# Retry/backoff so the build survives slow patches when reaching the npm registry.
+RUN npm ci --fetch-timeout=600000 --fetch-retries=5 --fetch-retry-maxtimeout=120000
 
 # Source
 COPY tsconfig.json ./
