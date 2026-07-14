@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ─── ERMAS Web (Next.js) ───────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
@@ -8,8 +9,11 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages ./packages
-# Retry/backoff so the build survives slow patches when reaching the npm registry.
-RUN npm ci --fetch-timeout=600000 --fetch-retries=5 --fetch-retry-maxtimeout=120000
+# Cache mount persists downloaded packages across build attempts so a flaky
+# registry connection makes forward progress instead of restarting each time.
+# --maxsockets limits parallel connections that otherwise saturate a weak link.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --fetch-timeout=600000 --fetch-retries=5 --fetch-retry-maxtimeout=120000 --maxsockets=3
 
 # Source
 COPY tsconfig.json ./
