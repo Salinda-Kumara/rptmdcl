@@ -1,3 +1,13 @@
+// Allow the browser to reach the API host named by NEXT_PUBLIC_API_URL.
+// Derived at build time so CSP tracks HOST_ADDR instead of hardcoding an origin.
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+let apiOrigin = 'http://localhost:3001';
+try {
+  apiOrigin = new URL(apiUrl).origin;
+} catch {
+  // Fall back to the localhost default if NEXT_PUBLIC_API_URL is malformed.
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -35,7 +45,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' http://localhost:3001 http://localhost:3000 ws: wss:;"
+            value: `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ${apiOrigin} http://localhost:3001 http://localhost:3000 ws: wss:;`
           }
         ]
       }
