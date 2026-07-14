@@ -162,25 +162,28 @@ export function DashboardPanel({ onNavigate }: Props) {
       </div>
 
       <div className="mb-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500">
-            <Wallet className="h-4 w-4" />
-            <p className="text-sm font-medium">Pending Payments</p>
-          </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{loading ? '—' : stats?.pendingPayments ?? 0}</p>
-          {isFinance && (
-            <button onClick={() => onNavigate('payments')} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline">
-              Verify payments <ArrowRight className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500">
-            <TrendingUp className="h-4 w-4" />
-            <p className="text-sm font-medium">Verified Revenue</p>
-          </div>
-          <p className="mt-2 text-2xl font-bold text-emerald-600">{loading ? '—' : formatLKR(stats?.verifiedRevenue ?? 0)}</p>
-        </div>
+        {/* Payment/revenue figures are for Finance (and admins) only. */}
+        {isFinance && (
+          <>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-slate-500">
+                <Wallet className="h-4 w-4" />
+                <p className="text-sm font-medium">Pending Payments</p>
+              </div>
+              <p className="mt-2 text-2xl font-bold text-slate-900">{loading ? '—' : stats?.pendingPayments ?? 0}</p>
+              <button onClick={() => onNavigate('payments')} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline">
+                Verify payments <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2 text-slate-500">
+                <TrendingUp className="h-4 w-4" />
+                <p className="text-sm font-medium">Verified Revenue</p>
+              </div>
+              <p className="mt-2 text-2xl font-bold text-emerald-600">{loading ? '—' : formatLKR(stats?.verifiedRevenue ?? 0)}</p>
+            </div>
+          </>
+        )}
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm font-medium text-slate-500">By Type</p>
           <div className="mt-3 space-y-2">
