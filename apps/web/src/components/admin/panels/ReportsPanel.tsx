@@ -17,7 +17,7 @@ const STATUS_OPTIONS = [
   { value: '',                 label: 'All statuses' },
   { value: 'SUBMITTED',        label: 'New (Submitted)' },
   { value: 'PAYMENT_PENDING',  label: 'Finance Pending' },
-  { value: 'PAYMENT_VERIFIED', label: 'Approved' },
+  { value: 'APPROVED',         label: 'Approved' },
   { value: 'REJECTED',         label: 'Exam Rejected' },
   { value: 'PAYMENT_REJECTED', label: 'Finance Rejected' },
 ];

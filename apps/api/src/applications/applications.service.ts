@@ -367,9 +367,10 @@ export class ApplicationsService {
       return this.findOneStaff(id);
     }
 
-    // APPROVE → payment verified.
+    // APPROVE → payment verified. Finance is the final stage, so approving here
+    // marks the whole application APPROVED.
     const ops: any[] = [
-      this.prisma.application.update({ where: { id }, data: { status: 'PAYMENT_VERIFIED' } }),
+      this.prisma.application.update({ where: { id }, data: { status: 'APPROVED' } }),
       this.prisma.approval.updateMany({
         where: { applicationId: id, stage: 2 },
         data: { status: 'APPROVED', approvedBy: userId, approvedAt: new Date() },
@@ -557,8 +558,9 @@ export class ApplicationsService {
   // approval / payment records so the earlier stage can act on it again, and
   // records an audit remark. Gated by the `rollback` permission at the route.
   private static readonly ROLLBACK_PREV: Record<string, string> = {
-    APPROVED:         'PAYMENT_VERIFIED',
-    PAYMENT_VERIFIED: 'PAYMENT_PENDING',
+    // Finance approval lands on APPROVED, so undoing it reopens the finance stage.
+    APPROVED:         'PAYMENT_PENDING',
+    PAYMENT_VERIFIED: 'PAYMENT_PENDING', // legacy rows created before APPROVED was terminal
     PAYMENT_REJECTED: 'PAYMENT_PENDING',
     PAYMENT_PENDING:  'SUBMITTED',
     REJECTED:         'SUBMITTED',
@@ -604,6 +606,7 @@ export class ApplicationsService {
 
     switch (application.status) {
       // Undo a Finance decision → reopen the payment-verification stage.
+      case 'APPROVED':
       case 'PAYMENT_VERIFIED':
       case 'PAYMENT_REJECTED':
         ops.push(

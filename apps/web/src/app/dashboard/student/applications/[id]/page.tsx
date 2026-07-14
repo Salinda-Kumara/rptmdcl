@@ -29,7 +29,7 @@ import {
   formatFee,
 } from '@/lib/applications-api';
 
-const WORKFLOW = ['DRAFT', 'SUBMITTED', 'PAYMENT_VERIFIED', 'UNDER_REVIEW', 'APPROVED'];
+const WORKFLOW = ['DRAFT', 'SUBMITTED', 'PAYMENT_PENDING', 'APPROVED'];
 
 // Mandatory attachments per application type (mirrors the API rule).
 const REQUIRED_DOCS: Record<'MEDICAL' | 'REPEAT', DocumentType[]> = {

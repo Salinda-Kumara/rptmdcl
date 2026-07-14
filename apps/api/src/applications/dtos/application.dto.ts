@@ -157,7 +157,7 @@ export class ReviewActionDto {
 
 // Stage 2 — Finance payment verification.
 export enum PaymentReviewAction {
-  APPROVE = 'APPROVE', // payment confirmed → status PAYMENT_VERIFIED
+  APPROVE = 'APPROVE', // payment confirmed → status APPROVED (finance is the final stage)
   REJECT = 'REJECT', // payment rejected (remark required) → status PAYMENT_REJECTED
 }
 

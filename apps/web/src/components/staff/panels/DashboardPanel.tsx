@@ -46,7 +46,7 @@ export function DashboardPanel({ onNavigate }: Props) {
   /* ──────────────── Finance dashboard ──────────────── */
   if (isFinanceOnly) {
     const toVerify = financeApps.filter((a) => a.status === 'PAYMENT_PENDING');
-    const approved = financeApps.filter((a) => a.status === 'PAYMENT_VERIFIED');
+    const approved = financeApps.filter((a) => a.status === 'APPROVED' || a.status === 'PAYMENT_VERIFIED');
     const rejected = financeApps.filter((a) => a.status === 'PAYMENT_REJECTED');
     const revenue = approved.reduce((sum, a) => sum + (a.totalFee || 0), 0);
 

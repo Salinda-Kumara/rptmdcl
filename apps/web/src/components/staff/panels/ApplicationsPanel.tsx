@@ -16,7 +16,7 @@ interface Props { onNavigate: (view: string, id?: string) => void; }
 type FinanceTab = 'pending' | 'approved' | 'rejected';
 const FINANCE_TABS: { key: FinanceTab; label: string; status: string; icon: React.ComponentType<{ className?: string }>; tint: string }[] = [
   { key: 'pending',  label: 'To Verify',        status: 'PAYMENT_PENDING',  icon: Wallet,       tint: 'text-amber-700' },
-  { key: 'approved', label: 'Approved',          status: 'PAYMENT_VERIFIED', icon: CheckCircle2, tint: 'text-emerald-700' },
+  { key: 'approved', label: 'Approved',          status: 'APPROVED',         icon: CheckCircle2, tint: 'text-emerald-700' },
   { key: 'rejected', label: 'Rejected',          status: 'PAYMENT_REJECTED', icon: XCircle,      tint: 'text-red-700' },
 ];
 
