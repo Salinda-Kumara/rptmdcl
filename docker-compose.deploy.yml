@@ -59,6 +59,10 @@ services:
         # Baked into the client bundle — must be the URL the BROWSER uses.
         NEXT_PUBLIC_API_URL: http://${HOST_ADDR:-localhost}:3001/api/v1
     container_name: ermas-web
+    environment:
+      # Also needed at runtime: next.config.js derives the CSP connect-src
+      # origin from this when the standalone server starts.
+      NEXT_PUBLIC_API_URL: http://${HOST_ADDR:-localhost}:3001/api/v1
     ports:
       - '3000:3000'
     depends_on:
