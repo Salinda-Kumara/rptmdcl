@@ -201,6 +201,17 @@ export default function ApplicationDetailPage() {
             )}
           </div>
 
+          {/* Approved — collection notice */}
+          {app.status === 'APPROVED' && (
+            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+              <div>
+                <p className="text-sm font-semibold text-emerald-800">Application Approved</p>
+                <p className="mt-0.5 text-sm text-emerald-700">You can collect your admission from the Examination Division.</p>
+              </div>
+            </div>
+          )}
+
           {/* Two-column body */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Main column */}
