@@ -223,6 +223,15 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
   /* derived */
   const subjKeys = (app?.applicationSubjects ?? []).map((s: any) => `s_${s.id}`);
   const docKeys  = (app?.documents ?? []).map((d) => `d_${d.id}`);
+  // Per-subject medical certificates, grouped by the subject they belong to.
+  const docsBySubject = new Map<string, any[]>();
+  (app?.documents ?? []).forEach((d: any) => {
+    if (!d.applicationSubjectId) return;
+    const list = docsBySubject.get(d.applicationSubjectId) ?? [];
+    list.push(d);
+    docsBySubject.set(d.applicationSubjectId, list);
+  });
+  const subjById = new Map<string, any>((app?.applicationSubjects ?? []).map((s: any) => [s.id, s]));
   const apDone   = APPLICANT_FIELDS.filter((f) => verified.has(f.key)).length;
   const suDone   = subjKeys.filter((k) => verified.has(k)).length;
   const doDone   = docKeys.filter((k) => verified.has(k)).length;
@@ -512,6 +521,24 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                         <span>Upcoming Intake: <b>{s.upcomingExamIntake}</b></span>
                       )}
                     </div>
+                    {/* Medical certificate(s) uploaded for this subject */}
+                    {(docsBySubject.get(s.id) ?? []).map((d: any) => (
+                      <div key={d.id} className="mt-2 flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50/50 px-2.5 py-1.5">
+                        <Paperclip className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-700">
+                          {DOC_TYPE_LABELS[d.documentType as keyof typeof DOC_TYPE_LABELS]} · {d.fileName}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); viewDoc(d.id); }}
+                          disabled={busyDoc === d.id}
+                          className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50"
+                        >
+                          {busyDoc === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
+                          View
+                        </button>
+                      </div>
+                    ))}
                   </div>
                   {on && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />}
                 </div>
@@ -549,7 +576,11 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                       {doc.fileName}
                     </p>
                     <p className={`mt-0.5 text-xs ${on ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {DOC_TYPE_LABELS[doc.documentType]}{on ? ' · Verified' : ''}
+                      {DOC_TYPE_LABELS[doc.documentType]}
+                      {doc.applicationSubjectId && subjById.get(doc.applicationSubjectId)
+                        ? ` · ${subjById.get(doc.applicationSubjectId).subject.code}`
+                        : ''}
+                      {on ? ' · Verified' : ''}
                     </p>
                   </div>
                   <button

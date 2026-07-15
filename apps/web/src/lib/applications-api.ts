@@ -39,6 +39,8 @@ export interface ApplicationDocument {
   fileSize: number;
   mimeType: string;
   uploadedAt: string;
+  // Set for per-subject medical certificates — links the document to the subject.
+  applicationSubjectId?: string | null;
 }
 
 export interface Application {
