@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileText, CalendarDays, GraduationCap,
-  BarChart3, LogOut, ShieldCheck, Menu, X, Crown, UserSquare2,
+  BarChart3, LogOut, Menu, X, Crown, UserSquare2,
   PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
@@ -90,11 +90,9 @@ export function StaffShell() {
           </button>
         ) : (
           <>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-violet-500 shadow-lg">
-              <ShieldCheck className="h-5 w-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-white leading-none">ERMAS</p>
+            <img src="/sab-campus-logo.png" alt="SAB" className="h-8 w-auto max-w-[110px] object-contain" />
+            <div className="flex-1 border-l border-indigo-700 pl-2.5">
+              <p className="text-sm font-bold text-white leading-none">ERMS</p>
               <p className="text-[10px] text-indigo-300 mt-0.5">Staff Portal</p>
             </div>
             <button onClick={() => applyCollapsed(true)} title="Collapse menu"
@@ -190,7 +188,7 @@ export function StaffShell() {
             <button onClick={() => setMobileOpen(true)} className="text-slate-600 dark:text-gray-400">
               <Menu className="h-6 w-6" />
             </button>
-            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">ERMAS Staff</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100">ERMS Staff</span>
           </div>
 
           <main className="w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8">

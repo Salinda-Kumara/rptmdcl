@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   LayoutDashboard, FileText, BarChart3, CalendarDays,
-  LogOut, Crown, Menu, X, Users, GraduationCap, BookOpen,
+  LogOut, Menu, X, Users, GraduationCap, BookOpen,
   Layers, UserSquare2, UserCog, ChevronDown, Settings, Database, ScrollText,
   PanelLeftClose, PanelLeftOpen, Boxes, MapPin,
 } from 'lucide-react';
@@ -126,11 +126,9 @@ export function AdminShell() {
           </button>
         ) : (
           <>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg">
-              <Crown className="h-5 w-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold leading-none text-white">ERMAS</p>
+            <img src="/sab-campus-logo.png" alt="SAB" className="h-8 w-auto max-w-[110px] object-contain" />
+            <div className="flex-1 border-l border-slate-700 pl-2.5">
+              <p className="text-sm font-bold leading-none text-white">ERMS</p>
               <p className="mt-0.5 text-[10px] text-amber-300">Admin Console</p>
             </div>
             <button onClick={() => applyCollapsed(true)} title="Collapse menu"
@@ -323,7 +321,7 @@ export function AdminShell() {
             <button onClick={() => setMobileOpen(true)} className="text-slate-600 dark:text-gray-400 lg:hidden">
               <Menu className="h-6 w-6" />
             </button>
-            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100 lg:hidden">ERMAS Admin</span>
+            <span className="text-sm font-semibold text-slate-900 dark:text-gray-100 lg:hidden">ERMS Admin</span>
             {view === 'dashboard' && (
               <div className="ml-auto">
                 <ProfileCluster />

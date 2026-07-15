@@ -14,6 +14,11 @@ export interface ApplicationSubject {
   caMarks?: number;
   subject: Subject;
   admissionPrinted?: boolean;
+  upcomingExamIntake?: string | null;
+  upcomingExamDate?: string | null;
+  previousExamDate?: string | null;
+  previousExamIntake?: string | null;
+  gradeEarned?: string | null;
 }
 
 export interface Payment {

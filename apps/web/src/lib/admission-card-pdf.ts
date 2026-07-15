@@ -89,7 +89,7 @@ async function buildAdmissionPdf(app: StaffApplication, exams: AdmissionExam[], 
   let y = M;
 
   // SAB Campus logo — flush to the top-left corner of the page.
-  const logo = await loadPng('/sab-logo-white.png');
+  const logo = await loadPng('/sab-campus-logo.png');
   const lh = 66;
   if (logo) {
     const lw = (logo.w / logo.h) * lh;

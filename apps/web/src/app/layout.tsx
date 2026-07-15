@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 const fontSans = FontSans({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
-  title: 'ERMAS - Examination Repeat & Medical Application Management System',
+  title: 'ERMS - Examination Repeat & Medical Application Management System',
   description: 'Streamline examination repeat and medical applications',
 };
 

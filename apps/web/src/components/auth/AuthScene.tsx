@@ -177,7 +177,7 @@ export function AuthScene({ title, subtitle, children }: Props) {
               <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-emerald-100/50 to-transparent dark:from-emerald-950/30" />
               <div className="relative mb-4 flex justify-center">
                 <Image
-                  src="/sab-logo-white.png"
+                  src="/sab-campus-logo.png"
                   alt="SAB Campus - The Institute of Chartered Accountants of Sri Lanka"
                   width={200}
                   height={64}

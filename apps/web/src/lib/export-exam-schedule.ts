@@ -71,7 +71,7 @@ export async function exportExamScheduleExcel(
   const names = (ids?: string[]) => (ids || []).map((i) => byId.get(i)).filter(Boolean).join(' / ');
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ERMAS';
+  wb.creator = 'ERMS';
   wb.created = new Date();
   const ws = wb.addWorksheet('Duty Schedule', {
     views: [{ state: 'frozen', ySplit: 6 }],

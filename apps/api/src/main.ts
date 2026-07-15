@@ -44,7 +44,7 @@ async function bootstrap() {
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('ERMAS API')
+    .setTitle('ERMS API')
     .setDescription('Examination Repeat & Medical Application Management System API')
     .setVersion('1.0.0')
     .addBearerAuth()

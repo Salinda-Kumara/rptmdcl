@@ -9,7 +9,6 @@ import {
   PlusCircle,
   User,
   LogOut,
-  GraduationCap,
   Menu,
   X,
 } from 'lucide-react';
@@ -63,11 +62,9 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
     <>
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-6 h-16 border-b border-slate-800/60">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-900/30">
-          <GraduationCap className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <p className="text-sm font-bold text-white leading-none">ERMAS</p>
+        <img src="/sab-campus-logo.png" alt="SAB" className="h-8 w-auto max-w-[120px] object-contain" />
+        <div className="border-l border-slate-700 pl-2.5">
+          <p className="text-sm font-bold text-white leading-none">ERMS</p>
           <p className="text-[10px] text-slate-400 mt-0.5">Student Portal</p>
         </div>
       </div>
@@ -148,7 +145,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
             <button onClick={() => setMobileOpen(true)} className="text-slate-600">
               <Menu className="h-6 w-6" />
             </button>
-            <span className="text-sm font-semibold text-slate-900">ERMAS</span>
+            <span className="text-sm font-semibold text-slate-900">ERMS</span>
           </div>
 
           <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>

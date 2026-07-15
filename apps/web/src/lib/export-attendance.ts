@@ -24,7 +24,7 @@ export interface AttendanceInput {
 
 async function logoBase64(): Promise<{ base64: string; extension: 'png' } | null> {
   try {
-    const res = await fetch('/sab-logo-white.png');
+    const res = await fetch('/sab-campus-logo.png');
     const blob = await res.blob();
     const base64 = await new Promise<string>((resolve, reject) => {
       const fr = new FileReader();
@@ -39,7 +39,7 @@ async function logoBase64(): Promise<{ base64: string; extension: 'png' } | null
 export async function exportAttendanceSheet(input: AttendanceInput) {
   const ExcelJS = (await import('exceljs')).default ?? (await import('exceljs'));
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'ERMAS';
+  wb.creator = 'ERMS';
   const ws = wb.addWorksheet('Attendance', {
     pageSetup: {
       paperSize: 9,           // A4
