@@ -81,7 +81,13 @@ export async function buildApplicationFormPdf(app: StaffApplication): Promise<Ui
   setF('normal', 8); text('School of Accounting and Business, No. 411 Galle - Colombo Rd, Colombo 04, Sri Lanka.', logoX, y + 13);
   text('Tel: 011-2101044', logoX, y + 24);
   setF('bold', 9); text('APPLICATION FOR THE END SEMESTER EXAMINATION', logoX, y + 38);
-  text(app.type === 'MEDICAL' ? 'MEDICAL APPLICATION' : 'REPEAT APPLICATION', logoX, y + 50);
+  // Categories are chosen per subject, so an application can mix Repeat and
+  // Medical/1st-Attempt subjects. Reflect the actual mix in the title.
+  const hasRepeat = subjects.some((s) => (s.category ?? '').toUpperCase() === 'REPEAT');
+  const hasMedical = subjects.some((s) => (s.category ?? '').toUpperCase() !== 'REPEAT');
+  const appTitle = hasRepeat && hasMedical ? 'MEDICAL / REPEAT APPLICATION'
+    : hasMedical ? 'MEDICAL APPLICATION' : 'REPEAT APPLICATION';
+  text(appTitle, logoX, y + 50);
   try {
     const { SAB_LOGO_DATA_URL } = await import('./sab-logo');
     doc.addImage(SAB_LOGO_DATA_URL, 'PNG', M - 14, y - 45, 120, 120);
@@ -193,29 +199,33 @@ export async function buildApplicationFormPdf(app: StaffApplication): Promise<Ui
   setF('normal', 9); text('6. Previous Examination Details;', M, y);
   y += 15;
 
-  // Only the table matching the application type is included.
-  const isMedical = app.type === 'MEDICAL';
-  const nRowsPrev = Math.max(1, subjects.length);
+  // Each subject appears under the table matching its own category. Repeat
+  // subjects use the Repeat table (with Grade Earned + Exam-Division outcome);
+  // Medical and 1st-Attempt subjects use the Medical table.
+  const repeatSubs = subjects.filter((s) => (s.category ?? '').toUpperCase() === 'REPEAT');
+  const medicalSubs = subjects.filter((s) => (s.category ?? '').toUpperCase() !== 'REPEAT');
   // Exam Division outcome for the Repeat table's confirmation column: rejected
   // outright, or confirmed once the exam division forwards it past SUBMITTED.
   const examConfirmation = app.status === 'REJECTED' ? 'Rejected'
     : ['PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'APPROVED', 'PAYMENT_REJECTED'].includes(app.status) ? 'Confirmed'
       : '';
 
-  if (isMedical) {
+  if (medicalSubs.length) {
     setF('bold', 8.5); text('Medical Exam ', M, y); y += 6;
     y = prevExamTable(doc, M, right, y,
       ['Course code', 'Course title', 'Date of the exam', 'Intake details'],
       [58, tableW - 58 - 100 - 90, 100, 90],
-      subjects.map((s) => [s.subject?.code ?? '', s.subject?.name ?? '', fmtDate(s.previousExamDate), s.previousExamIntake ?? '']),
-      nRowsPrev);
-  } else {
+      medicalSubs.map((s) => [s.subject?.code ?? '', s.subject?.name ?? '', fmtDate(s.previousExamDate), s.previousExamIntake ?? '']),
+      Math.max(1, medicalSubs.length));
+    y += 12;
+  }
+  if (repeatSubs.length) {
     setF('bold', 8.5); text('Repeat Exam', M, y); y += 6;
     y = prevExamTable(doc, M, right, y,
       ['Course code', 'Course title', 'Date of the exam', 'Intake details', 'Grade Earned', 'Confirmation from Exam Div.'],
       [52, tableW - 52 - 68 - 58 - 52 - 82, 68, 58, 52, 82],
-      subjects.map((s) => [s.subject?.code ?? '', s.subject?.name ?? '', fmtDate(s.previousExamDate), s.previousExamIntake ?? '', s.gradeEarned ?? '', examConfirmation]),
-      nRowsPrev);
+      repeatSubs.map((s) => [s.subject?.code ?? '', s.subject?.name ?? '', fmtDate(s.previousExamDate), s.previousExamIntake ?? '', s.gradeEarned ?? '', examConfirmation]),
+      Math.max(1, repeatSubs.length));
   }
   y += 20;
 

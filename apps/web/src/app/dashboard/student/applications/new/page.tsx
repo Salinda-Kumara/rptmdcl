@@ -5,9 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
-  RefreshCw,
-  HeartPulse,
-  CheckCircle2,
   AlertCircle,
   Check,
   UserCheck,
@@ -15,23 +12,27 @@ import {
   Search,
   Plus,
   X,
+  Paperclip,
 } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
-import { applicationsApi, studentsApi, Subject, ApplicantDetails, ScheduledExamInfo } from '@/lib/applications-api';
+import { applicationsApi, studentsApi, documentsApi, Subject, ApplicantDetails, ScheduledExamInfo } from '@/lib/applications-api';
 import apiClient from '@/lib/api-client';
 
-type AppType = 'REPEAT' | 'MEDICAL';
 type Category = 'REPEAT' | 'MEDICAL' | '1ST_ATTEMPT';
 
 interface SelectedSubject {
   subjectId: string;
-  category: Category;
+  // Empty until the student picks a category (the dropdown starts unselected).
+  category: Category | '';
   caMarks: string;
   upcomingExamIntake: string;
   upcomingExamDate: string;
   previousExamDate: string;
   previousExamIntake: string;
   gradeEarned: string;
+  // Medical-category subjects require a certificate, attached here and uploaded
+  // after the draft is created.
+  medicalCertificate?: File;
 }
 
 // Bank payment details from the physical form
@@ -42,8 +43,10 @@ const BANK_DETAILS = {
   account: '000460002370',
 };
 
-const FEES = { REPEAT: 2600, MEDICAL: 5200 };
-const STEPS = ['Your Details', 'Type', 'Subjects', 'Review'];
+// Per-subject fee by category (LKR). Repeat is the discounted rate; Medical and
+// 1st-Attempt re-sits are charged the higher rate.
+const FEES: Record<Category, number> = { REPEAT: 2600, MEDICAL: 5200, '1ST_ATTEMPT': 5200 };
+const STEPS = ['Your Details', 'Subjects', 'Review'];
 
 // All personal details are editable for this application only.
 interface ApplicantForm {
@@ -74,19 +77,19 @@ const EMPTY_APPLICANT: ApplicantForm = {
   email: '',
 };
 
-// Valid subject categories per application type.
-// A Repeat application cannot contain a "Medical" subject, and vice versa.
-const CATEGORY_OPTIONS: Record<AppType, { value: Category; label: string }[]> = {
-  REPEAT: [
-    { value: 'REPEAT', label: 'Repeat' },
-  ],
-  MEDICAL: [
-    { value: 'MEDICAL', label: 'Medical' },
-    { value: '1ST_ATTEMPT', label: '1st Attempt' },
-  ],
-};
+// The category is chosen per subject. Each subject may independently be a
+// Repeat, Medical re-sit, or 1st-Attempt re-sit.
+const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
+  { value: 'REPEAT', label: 'Repeat' },
+  { value: 'MEDICAL', label: 'Medical' },
+  { value: '1ST_ATTEMPT', label: '1st Attempt' },
+];
 
-const defaultCategoryFor = (type: AppType): Category => (type === 'MEDICAL' ? 'MEDICAL' : 'REPEAT');
+// The category dropdown starts with no selection — the student must choose.
+const DEFAULT_CATEGORY = '' as const;
+
+// Per-subject fee; 0 while no category is chosen yet.
+const feeForCategory = (category: Category | ''): number => (category ? FEES[category] : 0);
 
 function generateInitials(fullName: string): string {
   if (!fullName) return '';
@@ -100,8 +103,13 @@ function generateInitials(fullName: string): string {
 export default function NewApplicationPage() {
   const router = useRouter();
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [appType, setAppType] = useState<AppType>('REPEAT');
+  // Today in Sri Lanka (Asia/Colombo), YYYY-MM-DD — caps date fields that can't
+  // be in the future (e.g. a previous exam date).
+  const todayISO = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Colombo' });
+
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // Once the student tries to continue, missing fields are highlighted in red.
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selected, setSelected] = useState<SelectedSubject[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -186,7 +194,7 @@ export default function NewApplicationPage() {
 
   const emptySubject = (subjectId: string): SelectedSubject => ({
     subjectId,
-    category: defaultCategoryFor(appType),
+    category: DEFAULT_CATEGORY,
     caMarks: '',
     upcomingExamIntake: '',
     upcomingExamDate: '',
@@ -224,21 +232,6 @@ export default function NewApplicationPage() {
     return [...matches].sort((a, b) => scheduleDate(a).localeCompare(scheduleDate(b)))[0];
   };
 
-  // Changing the application type re-normalizes any already-selected subject
-  // categories so they remain valid for the new type.
-  const selectType = (type: AppType) => {
-    setAppType(type);
-    const allowed = CATEGORY_OPTIONS[type].map((o) => o.value);
-    setSelected((prev) =>
-      prev.map((s) => ({
-        ...s,
-        category: allowed.includes(s.category) ? s.category : defaultCategoryFor(type),
-        // Grade earned only applies to repeat subjects
-        gradeEarned: type === 'REPEAT' ? s.gradeEarned : '',
-      })),
-    );
-  };
-
   const toggleSubject = (subjectId: string) => {
     setSelected((prev) => {
       const exists = prev.find((s) => s.subjectId === subjectId);
@@ -261,16 +254,42 @@ export default function NewApplicationPage() {
     );
   };
 
+  const setCertificate = (subjectId: string, file: File | undefined) => {
+    setSelected((prev) =>
+      prev.map((s) => (s.subjectId === subjectId ? { ...s, medicalCertificate: file } : s))
+    );
+  };
+
+  // Per-subject missing/invalid fields, keyed by field name — drives the inline
+  // red highlighting once the student has attempted to continue.
+  const subjectFieldErrors = (s: SelectedSubject): Set<keyof SelectedSubject> => {
+    const e = new Set<keyof SelectedSubject>();
+    if (!s.category) e.add('category');
+    if (s.caMarks === '' || s.caMarks === undefined) e.add('caMarks');
+    if (!s.upcomingExamIntake.trim()) e.add('upcomingExamIntake');
+    if (!s.upcomingExamDate || s.upcomingExamDate < todayISO) e.add('upcomingExamDate');
+    if (!s.previousExamDate || s.previousExamDate > todayISO) e.add('previousExamDate');
+    if (!s.previousExamIntake.trim()) e.add('previousExamIntake');
+    if (s.category === 'REPEAT' && !s.gradeEarned.trim()) e.add('gradeEarned');
+    if (s.category === 'MEDICAL' && !s.medicalCertificate) e.add('medicalCertificate');
+    return e;
+  };
+
   const validateStep2 = () => {
     if (selected.length === 0) { setError('Select at least one subject'); return false; }
+    setShowFieldErrors(true);
     for (const s of selected) {
       const code = subjects.find((subj) => subj.id === s.subjectId)?.code ?? 'subject';
+      if (!s.category) { setError(`Select a category (${code})`); return false; }
       if (s.caMarks === '' || s.caMarks === undefined) { setError(`CA Marks are required (${code})`); return false; }
       if (!s.upcomingExamIntake.trim()) { setError(`Upcoming Exam Intake is required (${code})`); return false; }
       if (!s.upcomingExamDate) { setError(`Upcoming Exam Date is required (${code})`); return false; }
+      if (s.upcomingExamDate < todayISO) { setError(`Upcoming Exam Date cannot be in the past (${code})`); return false; }
       if (!s.previousExamDate) { setError(`Date of Previous Exam is required (${code})`); return false; }
+      if (s.previousExamDate > todayISO) { setError(`Date of Previous Exam cannot be in the future (${code})`); return false; }
       if (!s.previousExamIntake.trim()) { setError(`Previous exam Intake Details are required (${code})`); return false; }
-      if (appType === 'REPEAT' && !s.gradeEarned.trim()) { setError(`Grade Earned is required (${code})`); return false; }
+      if (s.category === 'REPEAT' && !s.gradeEarned.trim()) { setError(`Grade Earned is required (${code})`); return false; }
+      if (s.category === 'MEDICAL' && !s.medicalCertificate) { setError(`A medical certificate is required (${code})`); return false; }
     }
     setError('');
     return true;
@@ -281,7 +300,6 @@ export default function NewApplicationPage() {
     setError('');
     try {
       const app = await applicationsApi.create({
-        type: appType,
         applicant: applicant as ApplicantDetails,
         subjects: selected.map((s) => ({
           subjectId: s.subjectId,
@@ -294,6 +312,19 @@ export default function NewApplicationPage() {
           gradeEarned: s.gradeEarned || undefined,
         })),
       });
+
+      // Upload each medical subject's certificate against its created
+      // application-subject. Match created subjects back by subjectId.
+      const certUploads = selected
+        .filter((s) => s.category === 'MEDICAL' && s.medicalCertificate)
+        .map((s) => {
+          const created = app.applicationSubjects.find((as) => as.subjectId === s.subjectId);
+          if (!created) return null;
+          return documentsApi.upload(app.id, 'MEDICAL_CERTIFICATE', s.medicalCertificate!, created.id);
+        })
+        .filter((p): p is ReturnType<typeof documentsApi.upload> => p !== null);
+      if (certUploads.length) await Promise.all(certUploads);
+
       router.push(`/dashboard/student/applications/${app.id}`);
     } catch (e: any) {
       setError(e.response?.data?.message || 'Failed to create application');
@@ -302,8 +333,10 @@ export default function NewApplicationPage() {
     }
   };
 
-  const feePerSubject = FEES[appType];
-  const totalFee = selected.length * feePerSubject;
+  // Fee is now per subject, driven by each subject's chosen category.
+  const totalFee = selected.reduce((sum, s) => sum + feeForCategory(s.category), 0);
+  // Any Medical subject makes the whole application require a medical certificate.
+  const derivedType: 'REPEAT' | 'MEDICAL' = selected.some((s) => s.category === 'MEDICAL') ? 'MEDICAL' : 'REPEAT';
 
   // Subjects already chosen (preserve selection order), and the remaining
   // pool filtered by the search box (matches code or name).
@@ -311,8 +344,13 @@ export default function NewApplicationPage() {
     .map((s) => subjects.find((subj) => subj.id === s.subjectId))
     .filter((subj): subj is Subject => Boolean(subj));
 
+  // Only subjects with an upcoming exam in an apply-enabled schedule can be
+  // applied for. Subjects with no scheduled (future-dated) exam are hidden — if
+  // nothing is scheduled/enabled, the pool is empty.
+  const schedulableSubjects = subjects.filter((subj) => scheduleForSubject(subj) !== null);
+
   const query = subjectSearch.trim().toLowerCase();
-  const availableSubjects = subjects.filter(
+  const availableSubjects = schedulableSubjects.filter(
     (subj) =>
       !selected.some((s) => s.subjectId === subj.id) &&
       (!query ||
@@ -321,16 +359,24 @@ export default function NewApplicationPage() {
   );
 
   // Detail form shown under each selected subject.
-  const renderSubjectForm = (subject: Subject, sel: SelectedSubject) => (
-    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+  const renderSubjectForm = (subject: Subject, sel: SelectedSubject) => {
+    const errs = showFieldErrors ? subjectFieldErrors(sel) : new Set<keyof SelectedSubject>();
+    // Border classes for a plain field: red when flagged, otherwise the default.
+    const bc = (field: keyof SelectedSubject) =>
+      errs.has(field)
+        ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+        : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100';
+    return (
+    <div className="grid grid-cols-1 gap-x-4 gap-y-3 px-4 pb-4 pt-3.5 sm:grid-cols-2 lg:grid-cols-4">
       <div>
         <label className="mb-1 block text-xs font-medium text-slate-600">Category *</label>
         <select
           value={sel.category}
           onChange={(e) => updateField(subject.id, 'category', e.target.value)}
-          className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          className={`w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('category')}`}
         >
-          {CATEGORY_OPTIONS[appType].map((opt) => (
+          <option value="" disabled>Select category…</option>
+          {CATEGORY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
@@ -343,7 +389,7 @@ export default function NewApplicationPage() {
           type="number" min={0} max={100} placeholder="0–100"
           value={sel.caMarks}
           onChange={(e) => updateField(subject.id, 'caMarks', e.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('caMarks')}`}
         />
       </div>
       <div>
@@ -358,9 +404,11 @@ export default function NewApplicationPage() {
           value={sel.upcomingExamIntake}
           onChange={(e) => updateField(subject.id, 'upcomingExamIntake', e.target.value)}
           className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
-            sel.upcomingExamIntake
-              ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
-              : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
+            errs.has('upcomingExamIntake')
+              ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+              : sel.upcomingExamIntake
+                ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
+                : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
           }`}
         />
       </div>
@@ -373,28 +421,80 @@ export default function NewApplicationPage() {
         </label>
         <input
           type="date"
+          min={todayISO}
           value={sel.upcomingExamDate}
           onChange={(e) => updateField(subject.id, 'upcomingExamDate', e.target.value)}
           className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
-            sel.upcomingExamDate
-              ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
-              : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
+            errs.has('upcomingExamDate')
+              ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+              : sel.upcomingExamDate
+                ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
+                : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
           }`}
         />
       </div>
 
-      <div className="sm:col-span-2 lg:col-span-3">
+      {/* Medical certificate — occupies the space beside the exam date for
+          Medical-category subjects. */}
+      {sel.category === 'MEDICAL' && (
+        <div className="sm:col-span-2 lg:col-span-2">
+          <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            Medical Certificate <span className="text-red-500">*</span>
+            <span className="font-normal text-slate-400">(PDF, JPG or PNG · max 10MB)</span>
+          </label>
+          {sel.medicalCertificate ? (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
+              <span className="flex items-center gap-2 truncate text-sm font-medium text-emerald-800">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <Check className="h-3.5 w-3.5" />
+                </span>
+                <span className="truncate">{sel.medicalCertificate.name}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setCertificate(subject.id, undefined)}
+                className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+              >
+                <X className="h-3.5 w-3.5" /> Remove
+              </button>
+            </div>
+          ) : (
+            <label className={`group flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-2 transition-colors ${
+              errs.has('medicalCertificate')
+                ? 'border-red-400 bg-red-50/40 hover:bg-red-50'
+                : 'border-blue-300 bg-blue-50/40 hover:border-blue-400 hover:bg-blue-50'
+            }`}>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                <Paperclip className="h-4 w-4" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-blue-700">Attach certificate</span>
+                <span className="block truncate text-xs text-slate-400">Click to upload a file</span>
+              </span>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={(e) => setCertificate(subject.id, e.target.files?.[0])}
+                className="hidden"
+              />
+            </label>
+          )}
+        </div>
+      )}
+
+      <div className="sm:col-span-2 lg:col-span-4">
         <p className="mb-2 border-t border-slate-200 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Previous Examination Details
         </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Date of Previous Exam <span className="text-red-500">*</span></label>
             <input
               type="date"
+              max={todayISO}
               value={sel.previousExamDate}
               onChange={(e) => updateField(subject.id, 'previousExamDate', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('previousExamDate')}`}
             />
           </div>
           <div>
@@ -404,24 +504,26 @@ export default function NewApplicationPage() {
               list="intake-list"
               value={sel.previousExamIntake}
               onChange={(e) => updateField(subject.id, 'previousExamIntake', e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('previousExamIntake')}`}
             />
           </div>
-          {appType === 'REPEAT' && (
+          {sel.category === 'REPEAT' && (
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned <span className="text-red-500">*</span></label>
               <input
                 type="text" placeholder="e.g. C, D, F"
                 value={sel.gradeEarned}
                 onChange={(e) => updateField(subject.id, 'gradeEarned', e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('gradeEarned')}`}
               />
             </div>
           )}
         </div>
       </div>
+
     </div>
-  );
+    );
+  };
 
   return (
     <StudentShell>
@@ -627,66 +729,8 @@ export default function NewApplicationPage() {
           </div>
         )}
 
-        {/* Step 2 — Application Type */}
+        {/* Step 2 — Subjects */}
         {step === 2 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <h2 className="text-base font-semibold text-slate-900">Select Application Type</h2>
-            <p className="mt-0.5 text-sm text-slate-500">Choose the type of examination application.</p>
-
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {([
-                { type: 'REPEAT' as AppType, title: 'Repeat', desc: 'Repeat a failed subject', fee: 2600, icon: RefreshCw, tint: 'blue' },
-                { type: 'MEDICAL' as AppType, title: 'Medical', desc: 'Re-sit on medical grounds', fee: 5200, icon: HeartPulse, tint: 'rose' },
-              ]).map(({ type, title, desc, fee, icon: Icon, tint }) => {
-                const active = appType === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => selectType(type)}
-                    className={`relative rounded-xl border-2 p-5 text-left transition-all ${
-                      active
-                        ? tint === 'rose'
-                          ? 'border-rose-500 bg-rose-50'
-                          : 'border-blue-600 bg-blue-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {active && (
-                      <CheckCircle2 className={`absolute right-3 top-3 h-5 w-5 ${tint === 'rose' ? 'text-rose-500' : 'text-blue-600'}`} />
-                    )}
-                    <div
-                      className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${
-                        tint === 'rose' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'
-                      }`}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <p className="font-semibold text-slate-900">{title}</p>
-                    <p className="mt-0.5 text-sm text-slate-500">{desc}</p>
-                    <p className={`mt-2 text-sm font-bold ${tint === 'rose' ? 'text-rose-600' : 'text-blue-600'}`}>
-                      LKR {fee.toLocaleString()} / subject
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setStep(1)} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Back
-              </button>
-              <button
-                onClick={() => setStep(3)}
-                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-              >
-                Continue to Subjects
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3 — Subjects */}
-        {step === 3 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             {/* Intake/batch suggestions for the "Intake Details" fields. */}
             <datalist id="intake-list">
@@ -696,12 +740,6 @@ export default function NewApplicationPage() {
             <p className="mt-0.5 text-sm text-slate-500">
               Select each subject and fill the details. <span className="font-medium text-slate-700">CA Marks are mandatory.</span>
             </p>
-
-            {error && (
-              <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                <AlertCircle className="h-4 w-4" /> {error}
-              </div>
-            )}
 
             {loadingSubjects ? (
               <div className="mt-5 space-y-2">
@@ -721,10 +759,15 @@ export default function NewApplicationPage() {
                       {selectedSubjects.map((subject) => {
                         const sel = selected.find((s) => s.subjectId === subject.id)!;
                         return (
-                          <div key={subject.id} className="rounded-xl border border-blue-300 bg-blue-50/50 p-4">
-                            <div className="flex items-start justify-between gap-3">
+                          <div key={subject.id} className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm ring-1 ring-blue-100/60">
+                            <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-blue-50/40 px-4 py-2.5">
                               <p className="text-sm font-semibold text-slate-900">
                                 <span className="text-blue-600">{subject.code}</span> — {subject.name}
+                                {sel.category && (
+                                  <span className="ml-2 rounded bg-white px-1.5 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                                    LKR {feeForCategory(sel.category).toLocaleString()}
+                                  </span>
+                                )}
                               </p>
                               <button
                                 onClick={() => toggleSubject(subject.id)}
@@ -769,11 +812,11 @@ export default function NewApplicationPage() {
                   <div className="mt-3 max-h-80 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200 p-2">
                     {availableSubjects.length === 0 ? (
                       <p className="py-6 text-center text-sm text-slate-400">
-                        {subjects.length === 0
-                          ? 'No subjects available for your programme.'
+                        {schedulableSubjects.length === 0
+                          ? 'No subjects are currently open for application. Applications open once an exam schedule is published and enabled.'
                           : query
                             ? `No subjects match “${subjectSearch}”.`
-                            : 'All subjects have been selected.'}
+                            : 'All available subjects have been selected.'}
                       </p>
                     ) : (
                       availableSubjects.map((subject) => (
@@ -801,17 +844,23 @@ export default function NewApplicationPage() {
 
             {selected.length > 0 && (
               <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm">
-                <span className="text-slate-600">{selected.length} subject(s) × LKR {feePerSubject.toLocaleString()}</span>
+                <span className="text-slate-600">{selected.length} subject(s)</span>
                 <span className="font-bold text-blue-700">Total: LKR {totalFee.toLocaleString()}.00</span>
               </div>
             )}
 
+            {error && (
+              <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                <AlertCircle className="h-4 w-4" /> {error}
+              </div>
+            )}
+
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setStep(2)} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <button onClick={() => setStep(1)} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Back
               </button>
               <button
-                onClick={() => { if (validateStep2()) setStep(4); }}
+                onClick={() => { if (validateStep2()) setStep(3); }}
                 className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
               >
                 Review ({selected.length} subject{selected.length !== 1 ? 's' : ''})
@@ -820,8 +869,8 @@ export default function NewApplicationPage() {
           </div>
         )}
 
-        {/* Step 4 — Review */}
-        {step === 4 && (
+        {/* Step 3 — Review */}
+        {step === 3 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="text-base font-semibold text-slate-900">Review &amp; Confirm</h2>
             <p className="mt-0.5 text-sm text-slate-500">Check the details before creating your application.</p>
@@ -845,7 +894,7 @@ export default function NewApplicationPage() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Type</span>
                 <span className="font-medium text-slate-900">
-                  {appType === 'REPEAT' ? 'Repeat' : 'Medical'}
+                  {derivedType === 'REPEAT' ? 'Repeat' : 'Medical'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -873,6 +922,7 @@ export default function NewApplicationPage() {
                       {s.upcomingExamDate && <span>Exam date: {new Date(s.upcomingExamDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })}</span>}
                       {s.previousExamDate && <span>Prev: {s.previousExamDate}</span>}
                       {s.gradeEarned && <span>Grade: {s.gradeEarned}</span>}
+                      {s.medicalCertificate && <span>Certificate: {s.medicalCertificate.name}</span>}
                     </div>
                   </div>
                 );
@@ -894,7 +944,7 @@ export default function NewApplicationPage() {
             )}
 
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setStep(3)} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <button onClick={() => setStep(2)} className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Back
               </button>
               <button

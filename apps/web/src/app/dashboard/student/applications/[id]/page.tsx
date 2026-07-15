@@ -27,9 +27,10 @@ import {
   STATUS_LABELS,
   STATUS_COLORS,
   formatFee,
+  applicationTypeLabel,
 } from '@/lib/applications-api';
 
-const WORKFLOW = ['DRAFT', 'SUBMITTED', 'PAYMENT_PENDING', 'APPROVED'];
+const WORKFLOW = ['DRAFT', 'SUBMITTED', 'PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'APPROVED'];
 
 // Mandatory attachments per application type (mirrors the API rule).
 const REQUIRED_DOCS: Record<'MEDICAL' | 'REPEAT', DocumentType[]> = {
@@ -149,7 +150,7 @@ export default function ApplicationDetailPage() {
                 <div>
                   <div className="flex items-center gap-2.5">
                     <h1 className="text-xl font-bold text-slate-900">
-                      {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} Application
+                      {applicationTypeLabel(app)} Application
                     </h1>
                     {app.serialNumber && (
                       <span className="rounded-lg bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 font-mono text-sm font-bold text-indigo-700">
@@ -306,7 +307,7 @@ export default function ApplicationDetailPage() {
                 <dl className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
                     <dt className="text-slate-500">Type</dt>
-                    <dd className="font-medium text-slate-900">{app.type === 'MEDICAL' ? 'Medical' : 'Repeat'}</dd>
+                    <dd className="font-medium text-slate-900">{applicationTypeLabel(app)}</dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt className="text-slate-500">Subjects</dt>

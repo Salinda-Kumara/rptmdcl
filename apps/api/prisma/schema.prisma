@@ -205,6 +205,7 @@ model ApplicationSubject {
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   subject     Subject     @relation(fields: [subjectId], references: [id])
+  documents   Document[]
 
   @@index([applicationId])
   @@index([subjectId])
@@ -238,6 +239,10 @@ model Payment {
 model Document {
   id              String   @id @default(uuid())
   applicationId   String
+  // When set, this document belongs to a specific subject (e.g. a medical
+  // certificate required for a Medical-category subject). Null for
+  // application-level documents like the payment slip.
+  applicationSubjectId String?
   documentType    String   // MEDICAL_CERTIFICATE, PAYMENT_SLIP
   fileName        String
   fileSize        Int
@@ -247,9 +252,11 @@ model Document {
   uploadedAt      DateTime @default(now())
   deletedAt       DateTime?
 
-  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application        Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  applicationSubject ApplicationSubject? @relation(fields: [applicationSubjectId], references: [id], onDelete: Cascade)
 
   @@index([applicationId])
+  @@index([applicationSubjectId])
   @@index([documentType])
   @@index([deletedAt])
 }

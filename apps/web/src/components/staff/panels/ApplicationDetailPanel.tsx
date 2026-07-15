@@ -9,7 +9,7 @@ import {
 import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { Modal } from '@/components/admin/Modal';
 import { useMyPermissions, can } from '@/lib/permissions';
-import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS } from '@/lib/applications-api';
+import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS, applicationTypeLabel } from '@/lib/applications-api';
 import { printApplicationPacket, openBlankTab } from '@/lib/application-form-pdf';
 
 const APPLICANT_FIELDS: { key: string; label: string }[] = [
@@ -182,6 +182,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
 
   const canReview = (isAdmin || can(permissions, 'applications', 'FULL')) && app?.status === 'SUBMITTED';
   const canFinance = (isAdmin || can(permissions, 'payments', 'FULL')) && app?.status === 'PAYMENT_PENDING';
+  const canApprove = (isAdmin || can(permissions, 'approvals', 'FULL')) && app?.status === 'PAYMENT_VERIFIED';
 
   // Which status a rollback would revert to (mirror of the API's ROLLBACK_PREV).
   const ROLLBACK_PREV: Record<string, string> = {
@@ -208,9 +209,9 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
   useEffect(() => {
     if (detailsAlreadyVerified && !collapsedOnce.current) {
       collapsedOnce.current = true;
-      setOpenSec(new Set(canFinance ? ['do'] : []));
+      setOpenSec(new Set(canFinance || canApprove ? ['do'] : []));
     }
-  }, [detailsAlreadyVerified, canFinance]);
+  }, [detailsAlreadyVerified, canFinance, canApprove]);
 
   const tick = (key: string) => {
     if (!canReview) return;
@@ -267,6 +268,17 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
       setApp(u); setShowReject(false); setRemark('');
     } catch (e: any) {
       setError(e.response?.data?.message?.toString() || 'Action failed');
+    } finally { setActing(null); }
+  };
+
+  const doApprove = async () => {
+    setError('');
+    setActing('FORWARD');
+    try {
+      const u = await staffApi.finalApprove(id, remark.trim() || undefined);
+      setApp(u); setRemark('');
+    } catch (e: any) {
+      setError(e.response?.data?.message?.toString() || 'Approval failed');
     } finally { setActing(null); }
   };
 
@@ -375,7 +387,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                     )}
                   </div>
                   <p className="mt-0.5 text-sm text-slate-400">
-                    {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} · {app.student?.registrationNumber}
+                    {applicationTypeLabel(app)} · {app.student?.registrationNumber}
                     {app.submittedAt && ` · Submitted ${new Date(app.submittedAt).toLocaleDateString('en-LK', { dateStyle: 'medium' })}`}
                   </p>
                 </div>
@@ -581,7 +593,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
               {[
-                { label: 'Type',     value: app.type === 'MEDICAL' ? 'Medical' : 'Repeat' },
+                { label: 'Type',     value: applicationTypeLabel(app) },
                 { label: 'Subjects', value: String(app.applicationSubjects.length) },
                 { label: 'Total Fee', value: formatFee(app.totalFee) },
                 { label: 'Payment Ref', value: app.paymentReferenceId || '—' },
@@ -816,6 +828,45 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                 )}
               </div>
             </div>
+          ) : canApprove ? (
+            <div className="rounded-2xl border border-emerald-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-emerald-100 px-6 py-4">
+                <ClipboardCheck className="h-4 w-4 text-emerald-500" />
+                <h3 className="text-sm font-semibold text-slate-800">Final Approval</h3>
+              </div>
+              <div className="p-6">
+                <p className="mb-4 text-xs text-slate-500">
+                  The Exam Division verified the details and Finance verified the payment. Give the
+                  final approval to make this application&apos;s subjects available in Admissions.
+                </p>
+
+                {error && (
+                  <div className="mb-4 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">Remark (optional)</label>
+                  <textarea
+                    value={remark}
+                    onChange={(e) => setRemark(e.target.value)}
+                    rows={2}
+                    placeholder="Add an optional note with the approval…"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                  />
+                </div>
+
+                <button
+                  onClick={doApprove}
+                  disabled={acting !== null}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {acting === 'FORWARD' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  Approve Application
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
               {['PAYMENT_VERIFIED', 'APPROVED'].includes(app.status)
@@ -826,7 +877,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
               <p className="text-sm text-slate-600">
                 {app.status === 'SUBMITTED'         ? 'Awaiting Exam Division verification.'
                 : app.status === 'PAYMENT_PENDING'  ? 'Verified — awaiting Finance payment verification.'
-                : app.status === 'PAYMENT_VERIFIED' ? 'Payment verified by Finance.'
+                : app.status === 'PAYMENT_VERIFIED' ? 'Payment verified by Finance — awaiting Exam Registrar final approval.'
                 : app.status === 'PAYMENT_REJECTED' ? 'Payment was rejected by Finance.'
                 : app.status === 'REJECTED'         ? 'This application was rejected.'
                 : `Status: ${STATUS_LABELS[app.status] || app.status}`}

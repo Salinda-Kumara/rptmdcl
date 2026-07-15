@@ -6,6 +6,7 @@ import { staffApi, StaffApplication, AdmissionExam } from '@/lib/staff-api';
 import { printAdmissionCard } from '@/lib/admission-card-pdf';
 import { exportAttendanceSheet } from '@/lib/export-attendance';
 import { useMyPermissions } from '@/lib/permissions';
+import { applicationTypeLabel, subjectCategoryLabel } from '@/lib/applications-api';
 
 // "Mohamed Zarook Fathima Zamnath Sahma" → "M. Z. F. Z. Sahma".
 const toInitials = (nameWith?: string | null, full?: string | null) => {
@@ -307,7 +308,7 @@ export function AdmissionsPanel() {
                         <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-gray-300">{a.student?.registrationNumber ?? '—'}</td>
                         <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{a.student?.fullName ?? '—'}</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-gray-400">{a.student?.batchNumber ?? '—'}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-gray-400">{a.type === 'MEDICAL' ? 'Medical' : 'Repeat'}</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-gray-400">{applicationTypeLabel(a)}</td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={() => toggle(a.id)}
@@ -328,6 +329,7 @@ export function AdmissionsPanel() {
                                   <tr className="bg-white text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:bg-gray-900 dark:text-gray-500">
                                     <th className="px-4 py-2">Subject Code</th>
                                     <th className="px-4 py-2">Subject Name</th>
+                                    <th className="px-4 py-2">Category</th>
                                     <th className="px-4 py-2">Date of Exam</th>
                                     <th className="px-4 py-2 text-center">Printed</th>
                                     <th className="px-4 py-2 text-right">Admission</th>
@@ -341,6 +343,13 @@ export function AdmissionsPanel() {
                                     <tr key={s.id} className="bg-white dark:bg-gray-900">
                                       <td className="px-4 py-2.5 font-mono text-xs text-slate-700 dark:text-gray-300">{s.subject?.code ?? '—'}</td>
                                       <td className="px-4 py-2.5 text-slate-700 dark:text-gray-300">{s.subject?.name ?? '—'}</td>
+                                      <td className="px-4 py-2.5">
+                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                          (s.category ?? '').toUpperCase() === 'REPEAT'
+                                            ? 'bg-blue-100 text-blue-600'
+                                            : 'bg-rose-100 text-rose-600'
+                                        }`}>{subjectCategoryLabel(s.category)}</span>
+                                      </td>
                                       <td className="px-4 py-2.5 text-slate-600 dark:text-gray-400">{dateOf(s.subject?.code)}</td>
                                       <td className="px-4 py-2.5 text-center">
                                         <input

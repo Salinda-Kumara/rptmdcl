@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { staffApi, StaffStats, StaffApplication, formatLKR } from '@/lib/staff-api';
 import { useMyPermissions, can } from '@/lib/permissions';
-import { STATUS_LABELS, STATUS_COLORS, formatFee } from '@/lib/applications-api';
+import { STATUS_LABELS, STATUS_COLORS, formatFee, applicationTypeLabel } from '@/lib/applications-api';
 
 interface Props { onNavigate: (view: string, id?: string) => void; }
 
@@ -40,13 +40,14 @@ export function DashboardPanel({ onNavigate }: Props) {
   /* ──────────────── Finance dashboard ──────────────── */
   if (isFinanceOnly) {
     const toVerify = financeApps.filter((a) => a.status === 'PAYMENT_PENDING');
+    // Finance-verified payments (whether or not the Registrar has since approved).
     const approved = financeApps.filter((a) => a.status === 'APPROVED' || a.status === 'PAYMENT_VERIFIED');
     const rejected = financeApps.filter((a) => a.status === 'PAYMENT_REJECTED');
     const revenue = approved.reduce((sum, a) => sum + (a.totalFee || 0), 0);
 
     const finCards = [
       { label: 'To Verify', value: toVerify.length, icon: Wallet, ring: 'bg-amber-50 text-amber-600', tint: 'from-amber-500 to-orange-500' },
-      { label: 'Approved', value: approved.length, icon: CheckCircle2, ring: 'bg-emerald-50 text-emerald-600', tint: 'from-emerald-500 to-green-500' },
+      { label: 'Verified', value: approved.length, icon: CheckCircle2, ring: 'bg-emerald-50 text-emerald-600', tint: 'from-emerald-500 to-green-500' },
       { label: 'Rejected', value: rejected.length, icon: XCircle, ring: 'bg-rose-50 text-rose-600', tint: 'from-rose-500 to-red-500' },
     ];
 
@@ -236,7 +237,7 @@ export function DashboardPanel({ onNavigate }: Props) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-slate-900">{app.student?.fullName || 'Unknown student'}</p>
                     <p className="truncate text-xs text-slate-500">
-                      {app.student?.registrationNumber} · {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} · {app.applicationSubjects.length} subject(s) · {formatFee(app.totalFee)}
+                      {app.student?.registrationNumber} · {applicationTypeLabel(app)} · {app.applicationSubjects.length} subject(s) · {formatFee(app.totalFee)}
                     </p>
                   </div>
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_COLORS[app.status] || 'bg-slate-100 text-slate-600'}`}>

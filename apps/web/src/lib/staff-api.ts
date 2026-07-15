@@ -79,6 +79,10 @@ export const staffApi = {
   financeReview: (id: string, action: 'APPROVE' | 'REJECT', remark?: string) =>
     apiClient.patch<StaffApplication>(`/applications/${id}/payment-review`, { action, remark }).then((r) => r.data),
 
+  // Stage 3 — Exam Registrar final approval (requires the `approvals` permission).
+  finalApprove: (id: string, remark?: string) =>
+    apiClient.patch<StaffApplication>(`/applications/${id}/final-approve`, { remark }).then((r) => r.data),
+
   // Roll an application back to its previous status (requires the `rollback`
   // permission and the acting user's password for confirmation).
   rollback: (id: string, password: string, remark?: string) =>

@@ -54,6 +54,7 @@ export class DocumentsService {
     applicationId: string,
     documentType: string,
     file: Express.Multer.File,
+    applicationSubjectId?: string,
   ) {
     this.validateFile(file, documentType);
     const student = await this.studentFor(userId);
@@ -69,11 +70,21 @@ export class DocumentsService {
       );
     }
 
+    // When the document targets a specific subject, verify the subject belongs
+    // to this application.
+    if (applicationSubjectId) {
+      const subject = await this.prisma.applicationSubject.findFirst({
+        where: { id: applicationSubjectId, applicationId },
+      });
+      if (!subject) throw new BadRequestException('Subject does not belong to this application');
+    }
+
     const storagePath = await this.storage.put(applicationId, file.originalname, file.buffer);
 
     return this.prisma.document.create({
       data: {
         applicationId,
+        applicationSubjectId: applicationSubjectId || null,
         documentType,
         fileName: file.originalname,
         fileSize: file.size,

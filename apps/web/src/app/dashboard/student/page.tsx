@@ -22,6 +22,7 @@ import {
   STATUS_LABELS,
   STATUS_COLORS,
   formatFee,
+  applicationTypeLabel,
 } from '@/lib/applications-api';
 
 export default function StudentDashboard() {
@@ -195,7 +196,7 @@ export default function StudentDashboard() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-slate-900">
-                          {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} Application
+                          {applicationTypeLabel(app)} Application
                         </p>
                         <p className="truncate text-xs text-slate-500">
                           {app.applicationSubjects.length} subject(s) · {formatFee(app.totalFee)} ·{' '}

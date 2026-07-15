@@ -15,7 +15,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '@/auth/guards/permissions.guard';
 import { RequirePermission } from '@/auth/decorators/require-permission.decorator';
 import { ApplicationsService } from './applications.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto } from './dtos/application.dto';
 
 @ApiTags('Applications')
 @Controller('applications')
@@ -141,6 +141,15 @@ export class ApplicationsController {
   @ApiOperation({ summary: 'Finance: approve or reject payment (staff)' })
   paymentReview(@Req() req: any, @Param('id') id: string, @Body() dto: PaymentReviewDto) {
     return this.applicationsService.financeReview(req.user.id, id, dto);
+  }
+
+  // Stage 3 — Exam Registrar final approval.
+  @Patch(':id/final-approve')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('approvals', 'FULL')
+  @ApiOperation({ summary: 'Exam Registrar: final approval of a payment-verified application (staff)' })
+  finalApprove(@Req() req: any, @Param('id') id: string, @Body() dto: FinalApprovalDto) {
+    return this.applicationsService.registrarApprove(req.user.id, id, dto);
   }
 
   // Roll an application back one stage (correct a wrongly-processed application).

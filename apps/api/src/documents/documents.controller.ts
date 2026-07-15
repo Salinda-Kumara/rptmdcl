@@ -40,9 +40,10 @@ export class DocumentsController {
     @Req() req: any,
     @Param('id') applicationId: string,
     @Body('documentType') documentType: string,
+    @Body('applicationSubjectId') applicationSubjectId: string | undefined,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.documentsService.upload(req.user.id, applicationId, documentType, file);
+    return this.documentsService.upload(req.user.id, applicationId, documentType, file, applicationSubjectId);
   }
 
   @Get('applications/:id/documents')

@@ -6,7 +6,7 @@ import {
   Loader2, Inbox, FileClock, Wallet, CheckCircle2, XCircle, ExternalLink, Printer,
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
-import { formatFee } from '@/lib/applications-api';
+import { formatFee, applicationTypeLabel } from '@/lib/applications-api';
 import { exportApplicationsExcel, exportApplicationsPdf } from '@/lib/export-applications';
 import { printApplicationById, openBlankTab } from '@/lib/application-form-pdf';
 import { useMyPermissions } from '@/lib/permissions';
@@ -324,7 +324,7 @@ export function ReportsPanel() {
                       <td className="px-4 py-2.5"><span className="rounded bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">{a.serialNumber || '—'}</span></td>
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-600 dark:text-gray-400">{a.student?.registrationNumber || '—'}</td>
                       <td className="px-4 py-2.5 text-sm font-medium text-slate-800 dark:text-gray-200">{a.student?.fullName || '—'}</td>
-                      <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${a.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{a.type === 'MEDICAL' ? 'Medical' : 'Repeat'}</span></td>
+                      <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${a.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{applicationTypeLabel(a)}</span></td>
                       <td className="px-4 py-2.5 text-center text-xs font-semibold text-slate-600 dark:text-gray-400">{a.applicationSubjects?.length ?? 0}</td>
                       <td className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-gray-300">{formatFee(a.totalFee)}</td>
                       <td className="px-4 py-2.5 text-xs text-slate-600 dark:text-gray-400">{

@@ -121,8 +121,11 @@ export class ApplicantDto {
 }
 
 export class CreateApplicationDto {
+  // Optional — the application type is derived server-side from the subject
+  // categories (any Medical subject → MEDICAL, otherwise REPEAT).
+  @IsOptional()
   @IsEnum(ApplicationType)
-  type: ApplicationType;
+  type?: ApplicationType;
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -165,6 +168,14 @@ export class PaymentReviewDto {
   @IsEnum(PaymentReviewAction)
   action: PaymentReviewAction;
 
+  @IsOptional()
+  @IsString()
+  remark?: string;
+}
+
+// Stage 3 — Exam Registrar final approval. Approving is the only action; an
+// optional remark may be recorded alongside it.
+export class FinalApprovalDto {
   @IsOptional()
   @IsString()
   remark?: string;

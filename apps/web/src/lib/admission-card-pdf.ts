@@ -160,8 +160,11 @@ async function buildAdmissionPdf(app: StaffApplication, exams: AdmissionExam[], 
   const headH = 26, minRowH = 30, lineH = 10;
   setF('normal', 8.5);
   // Wrap each course name and size the row to fit it fully.
+  // Suffix the course name with (R)/(M) to flag Repeat vs Medical/1st-Attempt.
+  const catSuffix = (cat?: string) => ((cat ?? '').toUpperCase() === 'REPEAT' ? ' (R)' : ' (M)');
   const rowsData = (subjects.length ? subjects : []).map((s) => {
-    const nameLines = doc.splitTextToSize((s.subject?.name ?? '').toString(), cols[1].w - 8) as string[];
+    const nameText = `${s.subject?.name ?? ''}${catSuffix(s.category)}`;
+    const nameLines = doc.splitTextToSize(nameText, cols[1].w - 8) as string[];
     return { s, nameLines, rowH: Math.max(minRowH, nameLines.length * lineH + 14) };
   });
   const bodyH = rowsData.length ? rowsData.reduce((sum, r) => sum + r.rowH, 0) : minRowH;

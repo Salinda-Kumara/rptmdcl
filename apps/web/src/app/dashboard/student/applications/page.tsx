@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FileText, PlusCircle, Inbox, Search, ChevronRight } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
-import { applicationsApi, Application, STATUS_LABELS, STATUS_COLORS, formatFee } from '@/lib/applications-api';
+import { applicationsApi, Application, STATUS_LABELS, STATUS_COLORS, formatFee, applicationTypeLabel } from '@/lib/applications-api';
 
 const FILTERS = [
   { key: 'ALL', label: 'All' },
@@ -143,7 +143,7 @@ export default function ApplicationsListPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold text-slate-900">
-                    {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} Application
+                    {applicationTypeLabel(app)} Application
                   </p>
                   {app.serialNumber && (
                     <span className="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-[10px] font-bold text-indigo-600">

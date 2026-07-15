@@ -8,13 +8,21 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '@/prisma/prisma.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto } from './dtos/application.dto';
 
 // Fee structure in LKR (whole rupees, as per the physical form)
 // Medical (re-sit on medical ground): LKR 5,200 per subject
 // Repeat / Re-Repeat: LKR 2,600 per subject
 const MEDICAL_FEE_PER_SUBJECT = 5200;
 const REPEAT_FEE_PER_SUBJECT = 2600;
+const FIRST_ATTEMPT_FEE_PER_SUBJECT = 5200;
+
+// Per-subject examination fee, driven by the subject's category. Repeat is the
+// discounted rate; Medical and 1st-Attempt re-sits are charged the higher rate.
+const feeForCategory = (category: string): number =>
+  category === 'REPEAT' ? REPEAT_FEE_PER_SUBJECT
+  : category === '1ST_ATTEMPT' ? FIRST_ATTEMPT_FEE_PER_SUBJECT
+  : MEDICAL_FEE_PER_SUBJECT;
 
 // Documents that must be attached before an application can be submitted.
 // Repeat → payment slip. Medical → payment slip + medical certificate.
@@ -92,8 +100,12 @@ export class ApplicationsService {
 
     await this.assertNoDuplicateSubjects(student.id, dto.subjects);
 
-    const feePerSubject = dto.type === 'REPEAT' ? REPEAT_FEE_PER_SUBJECT : MEDICAL_FEE_PER_SUBJECT;
-    const totalFee = dto.subjects.length * feePerSubject;
+    // Fee is summed per subject from each subject's category. The application
+    // type is derived from the categories: any Medical subject makes the whole
+    // application MEDICAL (so a medical certificate is required), otherwise
+    // REPEAT.
+    const totalFee = dto.subjects.reduce((sum, s) => sum + feeForCategory(s.category), 0);
+    const derivedType = dto.subjects.some((s) => s.category === 'MEDICAL') ? 'MEDICAL' : 'REPEAT';
 
     // Snapshot the applicant's details onto THIS application. Every field is
     // editable for the application and falls back to the student record when not
@@ -115,7 +127,7 @@ export class ApplicationsService {
 
     const application = await this.prisma.application.create({
       data: {
-        type: dto.type,
+        type: derivedType,
         status: 'DRAFT',
         studentId: student.id,
         totalFee,
@@ -219,19 +231,33 @@ export class ApplicationsService {
     await this.assertNoDuplicateSubjects(student.id, draftSubjects, id);
 
     // Enforce mandatory attachments before submission.
-    const required = REQUIRED_DOCUMENTS[application.type] ?? [];
-    if (required.length > 0) {
-      const docs = await this.prisma.document.findMany({
-        where: { applicationId: id, deletedAt: null },
-        select: { documentType: true },
-      });
-      const present = new Set(docs.map((d) => d.documentType));
-      const missing = required.filter((type) => !present.has(type));
-      if (missing.length > 0) {
-        throw new BadRequestException(
-          `Please attach the following before submitting: ${missing.map((m) => DOC_LABELS[m] || m).join(', ')}`,
-        );
-      }
+    const docs = await this.prisma.document.findMany({
+      where: { applicationId: id, deletedAt: null },
+      select: { documentType: true, applicationSubjectId: true },
+    });
+
+    // 1. A payment slip is always required.
+    const presentTypes = new Set(docs.map((d) => d.documentType));
+    if (!presentTypes.has('PAYMENT_SLIP')) {
+      throw new BadRequestException(
+        `Please attach the following before submitting: ${DOC_LABELS['PAYMENT_SLIP']}`,
+      );
+    }
+
+    // 2. Every Medical-category subject needs its own medical certificate.
+    const medicalSubjects = await this.prisma.applicationSubject.findMany({
+      where: { applicationId: id, category: 'MEDICAL' },
+      include: { subject: { select: { code: true } } },
+    });
+    const certifiedSubjectIds = new Set(
+      docs.filter((d) => d.documentType === 'MEDICAL_CERTIFICATE' && d.applicationSubjectId)
+        .map((d) => d.applicationSubjectId),
+    );
+    const uncertified = medicalSubjects.filter((s) => !certifiedSubjectIds.has(s.id));
+    if (uncertified.length > 0) {
+      throw new BadRequestException(
+        `Please attach a medical certificate for each medical subject: ${uncertified.map((s) => s.subject?.code ?? s.subjectId).join(', ')}`,
+      );
     }
 
     // A reference is required, but it need not be unique — the same reference
@@ -367,13 +393,19 @@ export class ApplicationsService {
       return this.findOneStaff(id);
     }
 
-    // APPROVE → payment verified. Finance is the final stage, so approving here
-    // marks the whole application APPROVED.
+    // APPROVE → payment verified. Finance is stage 2; approving here marks the
+    // payment VERIFIED and hands off to the Exam Registrar (stage 3) for the
+    // final approval that makes the application eligible for admission.
     const ops: any[] = [
-      this.prisma.application.update({ where: { id }, data: { status: 'APPROVED' } }),
+      this.prisma.application.update({ where: { id }, data: { status: 'PAYMENT_VERIFIED' } }),
       this.prisma.approval.updateMany({
         where: { applicationId: id, stage: 2 },
         data: { status: 'APPROVED', approvedBy: userId, approvedAt: new Date() },
+      }),
+      this.prisma.approval.upsert({
+        where: { applicationId_stage: { applicationId: id, stage: 3 } },
+        update: { status: 'PENDING' },
+        create: { applicationId: id, stage: 3, status: 'PENDING' }, // Stage 3: Exam Registrar final approval
       }),
     ];
     if (application.payment) {
@@ -384,6 +416,37 @@ export class ApplicationsService {
         }),
       );
     }
+    if (dto.remark && dto.remark.trim()) {
+      ops.push(
+        this.prisma.remark.create({ data: { applicationId: id, userId, content: dto.remark.trim() } }),
+      );
+    }
+    await this.prisma.$transaction(ops);
+    return this.findOneStaff(id);
+  }
+
+  // Stage 3 — Exam Registrar gives the final approval. Only a payment-verified
+  // application can be approved here; approving marks the whole application
+  // APPROVED, which is what makes its subjects appear in Admissions.
+  async registrarApprove(userId: string, id: string, dto: FinalApprovalDto) {
+    const application = await this.prisma.application.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+    if (application.status !== 'PAYMENT_VERIFIED') {
+      throw new BadRequestException(
+        'Only payment-verified applications awaiting final approval can be approved here',
+      );
+    }
+
+    const ops: any[] = [
+      this.prisma.application.update({ where: { id }, data: { status: 'APPROVED' } }),
+      this.prisma.approval.upsert({
+        where: { applicationId_stage: { applicationId: id, stage: 3 } },
+        update: { status: 'APPROVED', approvedBy: userId, approvedAt: new Date() },
+        create: { applicationId: id, stage: 3, status: 'APPROVED', approvedBy: userId, approvedAt: new Date() },
+      }),
+    ];
     if (dto.remark && dto.remark.trim()) {
       ops.push(
         this.prisma.remark.create({ data: { applicationId: id, userId, content: dto.remark.trim() } }),
@@ -469,11 +532,12 @@ export class ApplicationsService {
     });
   }
 
-  // Approved applications eligible for an admission card (finance-verified /
-  // approved). Used by the Admissions screen.
+  // Applications eligible for an admission card. Only those given final approval
+  // by the Exam Registrar (status APPROVED) appear here. Used by the Admissions
+  // screen.
   async findAdmissions() {
     return this.prisma.application.findMany({
-      where: { deletedAt: null, status: { in: ['PAYMENT_VERIFIED', 'APPROVED'] } },
+      where: { deletedAt: null, status: 'APPROVED' },
       include: {
         student: true,
         applicationSubjects: { include: { subject: true } },
@@ -558,9 +622,11 @@ export class ApplicationsService {
   // approval / payment records so the earlier stage can act on it again, and
   // records an audit remark. Gated by the `rollback` permission at the route.
   private static readonly ROLLBACK_PREV: Record<string, string> = {
-    // Finance approval lands on APPROVED, so undoing it reopens the finance stage.
-    APPROVED:         'PAYMENT_PENDING',
-    PAYMENT_VERIFIED: 'PAYMENT_PENDING', // legacy rows created before APPROVED was terminal
+    // Registrar final approval lands on APPROVED → undoing reopens stage 3.
+    APPROVED:         'PAYMENT_VERIFIED',
+    // Finance payment verification lands on PAYMENT_VERIFIED → undoing reopens
+    // the finance stage.
+    PAYMENT_VERIFIED: 'PAYMENT_PENDING',
     PAYMENT_REJECTED: 'PAYMENT_PENDING',
     PAYMENT_PENDING:  'SUBMITTED',
     REJECTED:         'SUBMITTED',
@@ -605,8 +671,19 @@ export class ApplicationsService {
     ];
 
     switch (application.status) {
-      // Undo a Finance decision → reopen the payment-verification stage.
+      // Undo the Registrar's final approval → reopen the registrar stage. The
+      // payment stays verified; only stage 3 is reset.
       case 'APPROVED':
+        ops.push(
+          this.prisma.approval.updateMany({
+            where: { applicationId: id, stage: 3 },
+            data: { status: 'PENDING', approvedBy: null, approvedAt: null },
+          }),
+        );
+        break;
+
+      // Undo a Finance decision → reopen the payment-verification stage, reset
+      // the payment, and drop the registrar stage that the approval created.
       case 'PAYMENT_VERIFIED':
       case 'PAYMENT_REJECTED':
         ops.push(
@@ -614,6 +691,7 @@ export class ApplicationsService {
             where: { applicationId: id, stage: 2 },
             data: { status: 'PENDING', approvedBy: null, approvedAt: null },
           }),
+          this.prisma.approval.deleteMany({ where: { applicationId: id, stage: 3 } }),
         );
         if (application.payment) {
           ops.push(

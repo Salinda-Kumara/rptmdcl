@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Inbox, RefreshCw, Search, ClipboardList, ShieldAlert, XCircle,
-  Wallet, CheckCircle2, BadgeCheck, FileClock, ChevronRight,
+  Wallet, CheckCircle2, BadgeCheck, ClipboardCheck, FileClock, ChevronRight,
   FileSpreadsheet, FileText, Loader2,
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
-import { formatFee } from '@/lib/applications-api';
+import { formatFee, applicationTypeLabel } from '@/lib/applications-api';
 import { useMyPermissions } from '@/lib/permissions';
 import { exportApplicationsExcel, exportApplicationsPdf } from '@/lib/export-applications';
 
@@ -16,7 +16,7 @@ interface Props { onNavigate: (view: string, id?: string) => void; }
 type FinanceTab = 'pending' | 'approved' | 'rejected';
 const FINANCE_TABS: { key: FinanceTab; label: string; status: string; icon: React.ComponentType<{ className?: string }>; tint: string }[] = [
   { key: 'pending',  label: 'To Verify',        status: 'PAYMENT_PENDING',  icon: Wallet,       tint: 'text-amber-700' },
-  { key: 'approved', label: 'Approved',          status: 'APPROVED',         icon: CheckCircle2, tint: 'text-emerald-700' },
+  { key: 'approved', label: 'Verified',          status: 'PAYMENT_VERIFIED', icon: CheckCircle2, tint: 'text-emerald-700' },
   { key: 'rejected', label: 'Rejected',          status: 'PAYMENT_REJECTED', icon: XCircle,      tint: 'text-red-700' },
 ];
 
@@ -45,7 +45,9 @@ function getActiveCol(status: string): ColKey {
   switch (status) {
     case 'SUBMITTED':        return 'ex-new';
     case 'PAYMENT_PENDING':  return 'fi-pending';
-    case 'PAYMENT_VERIFIED': return 'approved';
+    // Payment verified by Finance but not yet given final approval by the Exam
+    // Registrar — sits in the Finance "Verified" column, not Approved.
+    case 'PAYMENT_VERIFIED': return 'fi-verified';
     case 'PAYMENT_REJECTED': return 'fi-rejected';
     case 'REJECTED':         return 'ex-rejected';
     case 'APPROVED':         return 'approved';
@@ -63,7 +65,7 @@ const DONE_BEFORE: Record<ColKey, ColKey[]> = {
   'approved':    ['ex-new', 'ex-verified', 'fi-pending', 'fi-verified'],
 };
 
-type Tab = 'new' | 'finance' | 'approved' | 'all';
+type Tab = 'new' | 'finance' | 'registrar' | 'approved' | 'all';
 
 export function ApplicationsPanel({ onNavigate }: Props) {
   const { isAdmin, permissions } = useMyPermissions();
@@ -71,9 +73,21 @@ export function ApplicationsPanel({ onNavigate }: Props) {
   // focused view: only applications the Exam Division forwarded for payment
   // verification, split into To Verify / Approved / Rejected.
   const isFinanceOnly = !isAdmin && permissions.applications !== 'FULL' && !!permissions.payments;
+  // Exam Registrars (final-approval access, but not application reviewers or
+  // finance) land straight on the "Awaiting Final Approval" queue.
+  const isApproverFocused =
+    !isAdmin && permissions.applications !== 'FULL' && !permissions.payments && !!permissions.approvals;
   const [financeTab, setFinanceTab] = useState<FinanceTab>('pending');
 
   const [tab, setTab] = useState<Tab>('new');
+  // Apply the approver's default tab once, without overriding later manual switches.
+  const defaultedTab = useRef(false);
+  useEffect(() => {
+    if (!defaultedTab.current && isApproverFocused) {
+      defaultedTab.current = true;
+      setTab('registrar');
+    }
+  }, [isApproverFocused]);
   const [all, setAll] = useState<StaffApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -159,6 +173,8 @@ export function ApplicationsPanel({ onNavigate }: Props) {
   const newApps = sortBySerial(filtered.filter((a) => a.status === 'SUBMITTED'));
   // Finance Pending — forwarded to Finance and awaiting payment verification.
   const financeApps = sortBySerial(filtered.filter((a) => a.status === 'PAYMENT_PENDING'));
+  // Awaiting Final Approval — payment verified, awaiting the Exam Registrar.
+  const registrarApps = sortBySerial(filtered.filter((a) => a.status === 'PAYMENT_VERIFIED'));
   // Approved — payment verified / application approved (same grouping as the All-tab "Approved" column).
   const approvedList = sortBySerial(approvedApps);
 
@@ -274,7 +290,7 @@ export function ApplicationsPanel({ onNavigate }: Props) {
                     <td className="px-4 py-3"><span className="rounded bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">{app.serialNumber || '—'}</span></td>
                     <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700 dark:text-gray-300">{app.student?.registrationNumber || '—'}</td>
                     <td className="px-4 py-3"><p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{app.student?.fullName || '—'}</p><p className="text-[10px] text-slate-400 dark:text-gray-600">{app.student?.batchNumber}</p></td>
-                    <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{app.type === 'MEDICAL' ? 'Medical' : 'Repeat'}</span></td>
+                    <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{applicationTypeLabel(app)}</span></td>
                     <td className="px-4 py-3 text-right text-xs font-bold text-slate-800 dark:text-gray-200">{formatFee(app.totalFee)}</td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-gray-400">{app.paymentReferenceId || '—'}</td>
                     <td className="px-4 py-3 text-slate-300"><ChevronRight className="h-4 w-4" /></td>
@@ -367,7 +383,7 @@ export function ApplicationsPanel({ onNavigate }: Props) {
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                     app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'
                   }`}>
-                    {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'}
+                    {applicationTypeLabel(app)}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-center text-xs font-semibold text-slate-700 dark:text-gray-300">
@@ -527,6 +543,24 @@ export function ApplicationsPanel({ onNavigate }: Props) {
           )}
         </button>
         <button
+          onClick={() => setTab('registrar')}
+          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+            tab === 'registrar'
+              ? 'bg-white dark:bg-gray-700 text-emerald-700 dark:text-emerald-400 shadow-sm'
+              : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
+          }`}
+        >
+          <ClipboardCheck className="h-4 w-4" />
+          Awaiting Final Approval
+          {!loading && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              tab === 'registrar' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 dark:bg-gray-700 text-slate-500 dark:text-gray-400'
+            }`}>
+              {registrarApps.length}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setTab('approved')}
           className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
             tab === 'approved'
@@ -569,6 +603,9 @@ export function ApplicationsPanel({ onNavigate }: Props) {
 
       {/* ── Tab: Finance Pending ── */}
       {tab === 'finance' && renderAppTable(financeApps, 'hover:bg-amber-50/50 dark:hover:bg-amber-900/10', 'No applications pending payment verification')}
+
+      {/* ── Tab: Awaiting Final Approval ── */}
+      {tab === 'registrar' && renderAppTable(registrarApps, 'hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10', 'No applications awaiting final approval')}
 
       {/* ── Tab: Approved ── */}
       {tab === 'approved' && renderAppTable(approvedList, 'hover:bg-teal-50/50 dark:hover:bg-teal-900/10', 'No approved applications yet')}
@@ -723,7 +760,7 @@ export function ApplicationsPanel({ onNavigate }: Props) {
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'
                       }`}>
-                        {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'}
+                        {applicationTypeLabel(app)}
                       </span>
                     </td>
 

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { adminApi, AdminStudent } from '@/lib/admin-api';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
-import { STATUS_LABELS, STATUS_COLORS, formatFee } from '@/lib/applications-api';
+import { STATUS_LABELS, STATUS_COLORS, formatFee, applicationTypeLabel } from '@/lib/applications-api';
 
 const PAGE = 50;
 
@@ -93,7 +93,7 @@ function StudentDetailView({ student, onBack, onNavigateApp }: {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold text-slate-900">
-                    {app.type === 'MEDICAL' ? 'Medical' : 'Repeat'} Application
+                    {applicationTypeLabel(app)} Application
                   </p>
                   <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[app.status] || 'bg-slate-100 text-slate-600'}`}>
                     {STATUS_LABELS[app.status] || app.status}

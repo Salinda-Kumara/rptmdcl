@@ -69,12 +69,17 @@ export interface ApplicantDetails {
 }
 
 export interface CreateApplicationData {
-  type: 'MEDICAL' | 'REPEAT';
+  // Derived server-side from subject categories; no longer sent by the client.
   applicant?: ApplicantDetails;
   subjects: Array<{
     subjectId: string;
     category: 'MEDICAL' | 'REPEAT' | '1ST_ATTEMPT';
     caMarks?: number;
+    upcomingExamIntake?: string;
+    upcomingExamDate?: string;
+    previousExamDate?: string;
+    previousExamIntake?: string;
+    gradeEarned?: string;
   }>;
 }
 
@@ -139,9 +144,10 @@ export const documentsApi = {
       .get<ApplicationDocument[]>(`/applications/${applicationId}/documents`)
       .then((r) => r.data),
 
-  upload: (applicationId: string, documentType: DocumentType, file: File) => {
+  upload: (applicationId: string, documentType: DocumentType, file: File, applicationSubjectId?: string) => {
     const form = new FormData();
     form.append('documentType', documentType);
+    if (applicationSubjectId) form.append('applicationSubjectId', applicationSubjectId);
     form.append('file', file);
     return apiClient
       .post<ApplicationDocument>(`/applications/${applicationId}/documents`, form, {
@@ -194,4 +200,32 @@ export const STATUS_COLORS: Record<string, string> = {
 
 export function formatFee(amount: number) {
   return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
+}
+
+// Human label for a single subject's category.
+export function subjectCategoryLabel(category?: string): string {
+  const c = (category ?? '').toUpperCase();
+  if (c === 'REPEAT') return 'Repeat';
+  if (c === '1ST_ATTEMPT') return '1st Attempt';
+  if (c === 'MEDICAL') return 'Medical';
+  return category ?? '—';
+}
+
+// A single human label for an application's category mix. Categories are chosen
+// per subject, so an application may contain both Repeat and Medical/1st-Attempt
+// subjects — in that case show "Medical / Repeat" rather than the (misleading)
+// rolled-up `type`. Falls back to `type` when subjects aren't loaded.
+export function applicationTypeLabel(app: {
+  type?: string;
+  applicationSubjects?: Array<{ category?: string }>;
+}): string {
+  const subs = app.applicationSubjects ?? [];
+  if (subs.length) {
+    const hasRepeat = subs.some((s) => (s.category ?? '').toUpperCase() === 'REPEAT');
+    const hasMedical = subs.some((s) => (s.category ?? '').toUpperCase() !== 'REPEAT');
+    if (hasRepeat && hasMedical) return 'Medical / Repeat';
+    if (hasMedical) return 'Medical';
+    return 'Repeat';
+  }
+  return app.type === 'MEDICAL' ? 'Medical' : 'Repeat';
 }
