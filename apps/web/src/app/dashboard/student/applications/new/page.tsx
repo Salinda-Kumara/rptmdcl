@@ -30,9 +30,9 @@ interface SelectedSubject {
   previousExamDate: string;
   previousExamIntake: string;
   gradeEarned: string;
-  // Medical-category subjects require a certificate, attached here and uploaded
-  // after the draft is created.
-  medicalCertificate?: File;
+  // Medical-category subjects require at least one certificate, attached here
+  // and uploaded after the draft is created. A subject may have one or more.
+  medicalCertificates: File[];
 }
 
 // Bank payment details from the physical form
@@ -201,6 +201,7 @@ export default function NewApplicationPage() {
     previousExamDate: '',
     previousExamIntake: '',
     gradeEarned: '',
+    medicalCertificates: [],
   });
 
   // Prefer the revised date, else the original exam date, as a yyyy-mm-dd string.
@@ -254,9 +255,21 @@ export default function NewApplicationPage() {
     );
   };
 
-  const setCertificate = (subjectId: string, file: File | undefined) => {
+  const addCertificates = (subjectId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const picked = Array.from(files);
     setSelected((prev) =>
-      prev.map((s) => (s.subjectId === subjectId ? { ...s, medicalCertificate: file } : s))
+      prev.map((s) => (s.subjectId === subjectId
+        ? { ...s, medicalCertificates: [...s.medicalCertificates, ...picked] }
+        : s))
+    );
+  };
+
+  const removeCertificate = (subjectId: string, index: number) => {
+    setSelected((prev) =>
+      prev.map((s) => (s.subjectId === subjectId
+        ? { ...s, medicalCertificates: s.medicalCertificates.filter((_, i) => i !== index) }
+        : s))
     );
   };
 
@@ -271,7 +284,7 @@ export default function NewApplicationPage() {
     if (!s.previousExamDate || s.previousExamDate > todayISO) e.add('previousExamDate');
     if (!s.previousExamIntake.trim()) e.add('previousExamIntake');
     if (s.category === 'REPEAT' && !s.gradeEarned.trim()) e.add('gradeEarned');
-    if (s.category === 'MEDICAL' && !s.medicalCertificate) e.add('medicalCertificate');
+    if (s.category === 'MEDICAL' && s.medicalCertificates.length === 0) e.add('medicalCertificates');
     return e;
   };
 
@@ -289,7 +302,7 @@ export default function NewApplicationPage() {
       if (s.previousExamDate > todayISO) { setError(`Date of Previous Exam cannot be in the future (${code})`); return false; }
       if (!s.previousExamIntake.trim()) { setError(`Previous exam Intake Details are required (${code})`); return false; }
       if (s.category === 'REPEAT' && !s.gradeEarned.trim()) { setError(`Grade Earned is required (${code})`); return false; }
-      if (s.category === 'MEDICAL' && !s.medicalCertificate) { setError(`A medical certificate is required (${code})`); return false; }
+      if (s.category === 'MEDICAL' && s.medicalCertificates.length === 0) { setError(`At least one medical certificate is required (${code})`); return false; }
     }
     setError('');
     return true;
@@ -316,13 +329,13 @@ export default function NewApplicationPage() {
       // Upload each medical subject's certificate against its created
       // application-subject. Match created subjects back by subjectId.
       const certUploads = selected
-        .filter((s) => s.category === 'MEDICAL' && s.medicalCertificate)
-        .map((s) => {
+        .filter((s) => s.category === 'MEDICAL' && s.medicalCertificates.length > 0)
+        .flatMap((s) => {
           const created = app.applicationSubjects.find((as) => as.subjectId === s.subjectId);
-          if (!created) return null;
-          return documentsApi.upload(app.id, 'MEDICAL_CERTIFICATE', s.medicalCertificate!, created.id);
-        })
-        .filter((p): p is ReturnType<typeof documentsApi.upload> => p !== null);
+          if (!created) return [];
+          return s.medicalCertificates.map((file) =>
+            documentsApi.upload(app.id, 'MEDICAL_CERTIFICATE', file, created.id));
+        });
       if (certUploads.length) await Promise.all(certUploads);
 
       router.push(`/dashboard/student/applications/${app.id}`);
@@ -442,43 +455,49 @@ export default function NewApplicationPage() {
             Medical Certificate <span className="text-red-500">*</span>
             <span className="font-normal text-slate-400">(PDF, JPG or PNG · max 10MB)</span>
           </label>
-          {sel.medicalCertificate ? (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
-              <span className="flex items-center gap-2 truncate text-sm font-medium text-emerald-800">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                  <Check className="h-3.5 w-3.5" />
+          <div className="space-y-2">
+            {sel.medicalCertificates.map((file, idx) => (
+              <div key={idx} className="flex items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
+                <span className="flex items-center gap-2 truncate text-sm font-medium text-emerald-800">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="truncate">{file.name}</span>
                 </span>
-                <span className="truncate">{sel.medicalCertificate.name}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setCertificate(subject.id, undefined)}
-                className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
-              >
-                <X className="h-3.5 w-3.5" /> Remove
-              </button>
-            </div>
-          ) : (
+                <button
+                  type="button"
+                  onClick={() => removeCertificate(subject.id, idx)}
+                  className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" /> Remove
+                </button>
+              </div>
+            ))}
             <label className={`group flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-2 transition-colors ${
-              errs.has('medicalCertificate')
+              errs.has('medicalCertificates')
                 ? 'border-red-400 bg-red-50/40 hover:bg-red-50'
                 : 'border-blue-300 bg-blue-50/40 hover:border-blue-400 hover:bg-blue-50'
             }`}>
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
-                <Paperclip className="h-4 w-4" />
+                {sel.medicalCertificates.length > 0 ? <Plus className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />}
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-semibold text-blue-700">Attach certificate</span>
-                <span className="block truncate text-xs text-slate-400">Click to upload a file</span>
+                <span className="block text-sm font-semibold text-blue-700">
+                  {sel.medicalCertificates.length > 0 ? 'Add another certificate' : 'Attach certificate'}
+                </span>
+                <span className="block truncate text-xs text-slate-400">
+                  {sel.medicalCertificates.length > 0 ? 'You can attach more than one' : 'At least one required · click to upload'}
+                </span>
               </span>
               <input
                 type="file"
+                multiple
                 accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                onChange={(e) => setCertificate(subject.id, e.target.files?.[0])}
+                onChange={(e) => { addCertificates(subject.id, e.target.files); e.currentTarget.value = ''; }}
                 className="hidden"
               />
             </label>
-          )}
+          </div>
         </div>
       )}
 
@@ -922,7 +941,9 @@ export default function NewApplicationPage() {
                       {s.upcomingExamDate && <span>Exam date: {new Date(s.upcomingExamDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })}</span>}
                       {s.previousExamDate && <span>Prev: {s.previousExamDate}</span>}
                       {s.gradeEarned && <span>Grade: {s.gradeEarned}</span>}
-                      {s.medicalCertificate && <span>Certificate: {s.medicalCertificate.name}</span>}
+                      {s.medicalCertificates.length > 0 && (
+                        <span>Certificate{s.medicalCertificates.length > 1 ? `s: ${s.medicalCertificates.length}` : `: ${s.medicalCertificates[0].name}`}</span>
+                      )}
                     </div>
                   </div>
                 );

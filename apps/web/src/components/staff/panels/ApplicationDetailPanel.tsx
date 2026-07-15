@@ -222,7 +222,10 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
 
   /* derived */
   const subjKeys = (app?.applicationSubjects ?? []).map((s: any) => `s_${s.id}`);
-  const docKeys  = (app?.documents ?? []).map((d) => `d_${d.id}`);
+  // Medical certificates are shown under their subject, so the flat Attachments
+  // list (and its verification count) covers everything else — e.g. the pay slip.
+  const attachmentDocs = (app?.documents ?? []).filter((d) => d.documentType !== 'MEDICAL_CERTIFICATE');
+  const docKeys  = attachmentDocs.map((d) => `d_${d.id}`);
   // Per-subject medical certificates, grouped by the subject they belong to.
   const docsBySubject = new Map<string, any[]>();
   (app?.documents ?? []).forEach((d: any) => {
@@ -552,9 +555,9 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
             forceComplete={detailsAlreadyVerified} completeLabel="Verified by Exam Division"
             open={openSec.has('do')} onToggle={() => toggleSec('do')}
           >
-            {!app.documents || app.documents.length === 0 ? (
+            {attachmentDocs.length === 0 ? (
               <p className="px-6 py-8 text-center text-sm text-slate-400">No attachments.</p>
-            ) : app.documents.map((doc) => {
+            ) : attachmentDocs.map((doc) => {
               const key     = `d_${doc.id}`;
               const on      = verified.has(key);
               const isImage = doc.mimeType?.startsWith('image/');
