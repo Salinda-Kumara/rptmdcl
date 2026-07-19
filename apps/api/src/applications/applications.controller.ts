@@ -15,7 +15,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '@/auth/guards/permissions.guard';
 import { RequirePermission } from '@/auth/decorators/require-permission.decorator';
 import { ApplicationsService } from './applications.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto, DeclineSubjectDto, ResubmitApplicationDto } from './dtos/application.dto';
 
 @ApiTags('Applications')
 @Controller('applications')
@@ -51,6 +51,12 @@ export class ApplicationsController {
     @Body() dto: SubmitApplicationDto,
   ) {
     return this.applicationsService.submit(req.user.id, id, dto);
+  }
+
+  @Patch('my/:id/resubmit')
+  @ApiOperation({ summary: 'Correct and resubmit a returned application (student)' })
+  resubmitApplication(@Req() req: any, @Param('id') id: string, @Body() dto: ResubmitApplicationDto) {
+    return this.applicationsService.resubmit(req.user.id, id, dto);
   }
 
   @Delete('my/:id')
@@ -132,6 +138,15 @@ export class ApplicationsController {
   @ApiOperation({ summary: 'Exam Division: reject or forward to finance (staff)' })
   examReview(@Req() req: any, @Param('id') id: string, @Body() dto: ReviewActionDto) {
     return this.applicationsService.examReview(req.user.id, id, dto);
+  }
+
+  // Exam Division — decline a single subject while keeping the rest.
+  @Patch(':id/subjects/:subjectId/decline')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('applications', 'FULL')
+  @ApiOperation({ summary: 'Exam Division: decline one subject on an application (staff)' })
+  declineSubject(@Req() req: any, @Param('id') id: string, @Param('subjectId') subjectId: string, @Body() dto: DeclineSubjectDto) {
+    return this.applicationsService.declineSubject(req.user.id, id, subjectId, dto);
   }
 
   // Stage 2 — Finance payment verification.

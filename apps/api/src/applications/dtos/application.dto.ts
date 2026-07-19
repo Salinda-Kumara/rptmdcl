@@ -146,7 +146,8 @@ export class SubmitApplicationDto {
 
 export enum ReviewAction {
   FORWARD = 'FORWARD', // pass data-validity check → send to finance for payment verification
-  REJECT = 'REJECT', // reject the application (remark required)
+  REJECT = 'REJECT', // reject the whole application (remark required)
+  RETURN = 'RETURN', // return to the student to correct and resubmit (remark required)
 }
 
 export class ReviewActionDto {
@@ -156,6 +157,62 @@ export class ReviewActionDto {
   @IsOptional()
   @IsString()
   remark?: string;
+}
+
+// Exam Division: decline a single subject on an application while forwarding the
+// rest. A reason is required and recorded against the subject.
+export class DeclineSubjectDto {
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
+}
+
+// Student: the editable fields when correcting a RETURNED application. The set
+// of subjects and their categories are fixed (they determine the paid fee); only
+// the data fields flagged for correction may change, matched by subject-row id.
+export class ResubmitSubjectDto {
+  @IsString()
+  @IsNotEmpty()
+  id: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  caMarks?: number;
+
+  @IsOptional()
+  @IsString()
+  upcomingExamIntake?: string;
+
+  @IsOptional()
+  @IsDateString()
+  upcomingExamDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  previousExamDate?: string;
+
+  @IsOptional()
+  @IsString()
+  previousExamIntake?: string;
+
+  @IsOptional()
+  @IsString()
+  gradeEarned?: string;
+}
+
+export class ResubmitApplicationDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ApplicantDto)
+  applicant?: ApplicantDto;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ResubmitSubjectDto)
+  subjects?: ResubmitSubjectDto[];
 }
 
 // Stage 2 — Finance payment verification.

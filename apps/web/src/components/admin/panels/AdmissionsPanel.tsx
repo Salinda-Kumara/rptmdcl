@@ -5,6 +5,7 @@ import { GraduationCap, Search, Printer, Loader2, Inbox, ChevronRight, X, FileSp
 import { staffApi, StaffApplication, AdmissionExam } from '@/lib/staff-api';
 import { printAdmissionCard } from '@/lib/admission-card-pdf';
 import { exportAttendanceSheet } from '@/lib/export-attendance';
+import { exportMarksheet } from '@/lib/export-marksheet';
 import { useMyPermissions } from '@/lib/permissions';
 import { applicationTypeLabel, subjectCategoryLabel } from '@/lib/applications-api';
 
@@ -42,6 +43,7 @@ export function AdmissionsPanel() {
   const [hidePrinted, setHidePrinted] = useState(false);
   const [printing, setPrinting] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingMarks, setExportingMarks] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -113,7 +115,7 @@ export function AdmissionsPanel() {
   // Distinct subjects across the filtered results, each with its candidates.
   // Attendance export requires the filter to resolve to exactly one subject.
   const exportGroups = useMemo(() => {
-    const m = new Map<string, { code: string; name: string; candidates: { regNo: string; name: string; nic: string }[] }>();
+    const m = new Map<string, { code: string; name: string; candidates: { regNo: string; name: string; nic: string; category?: string | null }[] }>();
     for (const a of list) {
       for (const s of (a.applicationSubjects ?? []).filter(subjectMatches)) {
         const code = s.subject?.code ?? '';
@@ -122,6 +124,7 @@ export function AdmissionsPanel() {
           regNo: a.student?.registrationNumber ?? '',
           name: toInitials(a.student?.nameWithInitials, a.student?.fullName),
           nic: a.student?.nic ?? '',
+          category: s.category,
         });
       }
     }
@@ -165,6 +168,38 @@ export function AdmissionsPanel() {
       console.error('Attendance export failed', err);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const doExportMarksheet = async () => {
+    if (!canExport) return;
+    const g = exportGroups[0];
+    const e = examByCode.get(normCode(g.code));
+    setExportingMarks(true);
+    try {
+      const prog = normCode(g.code).startsWith('BMBA')
+        ? 'B.Mgt (Business Analytics) General / Special Degree Programme'
+        : 'BSc. (Applied Accounting) General/Special Degree Programme';
+      const eff = e?.revisedDate || e?.examDate || null;
+      const monthName = (d: string) => new Date(d).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' });
+      let period = eff ? `${monthName(eff)} ${new Date(eff).getUTCFullYear()}` : '';
+      if (e?.schedule?.startDate && e?.schedule?.endDate) {
+        const s = e.schedule.startDate, en = e.schedule.endDate;
+        const sm = monthName(s), em = monthName(en), yr = new Date(en).getUTCFullYear();
+        period = sm === em ? `${sm} ${yr}` : `${sm}/${em} ${yr}`;
+      }
+      await exportMarksheet({
+        programmeTitle: prog,
+        examName: `End Semester Examination - ${period}`.trim(),
+        courseLine: `${g.code} ${g.name}`.trim(),
+        intakeLine: e?.intake ? `INTAKE ${e.intake}` : '',
+        candidates: g.candidates,
+        fileName: `marksheet-${normCode(g.code)}${eff ? '-' + eff.slice(0, 10) : ''}.xlsx`,
+      });
+    } catch (err) {
+      console.error('Marksheet export failed', err);
+    } finally {
+      setExportingMarks(false);
     }
   };
 
@@ -269,6 +304,15 @@ export function AdmissionsPanel() {
           >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
             Export Attendance
+          </button>
+          <button
+            onClick={doExportMarksheet}
+            disabled={!canExport || exportingMarks}
+            title={canExport ? 'Export detailed mark sheet for the filtered subject' : 'Filter to a single subject (and date) to export its mark sheet'}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400"
+          >
+            {exportingMarks ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            Export Marksheet
           </button>
         </div>
       </div>

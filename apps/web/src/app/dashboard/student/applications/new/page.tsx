@@ -607,7 +607,7 @@ export default function NewApplicationPage() {
             <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-700">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                Please confirm that your details are correct. If any details are incorrect, please update them accordingly.
+                Please update your address, mobile or email if any of those are incorrect.
               </p>
             </div>
 
@@ -628,15 +628,9 @@ export default function NewApplicationPage() {
                 <input
                   type="text"
                   value={applicant.fullName}
-                  onChange={(e) => {
-                    const upper = e.target.value.toUpperCase();
-                    setApplicant(prev => ({
-                      ...prev,
-                      fullName: upper,
-                      nameWithInitials: generateInitials(upper)
-                    }));
-                  }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  readOnly
+                  title="Managed by the institute — cannot be edited"
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm uppercase text-slate-500 focus:outline-none"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -644,8 +638,9 @@ export default function NewApplicationPage() {
                 <input
                   type="text"
                   value={applicant.nameWithInitials}
-                  onChange={(e) => updateApplicant('nameWithInitials', e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  readOnly
+                  title="Managed by the institute — cannot be edited"
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 focus:outline-none"
                 />
               </div>
               <div>
@@ -653,8 +648,9 @@ export default function NewApplicationPage() {
                 <input
                   type="text"
                   value={applicant.registrationNumber}
-                  onChange={(e) => updateApplicant('registrationNumber', e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  readOnly
+                  title="Managed by the institute — cannot be edited"
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 focus:outline-none"
                 />
               </div>
               <div>
@@ -662,8 +658,9 @@ export default function NewApplicationPage() {
                 <input
                   type="text"
                   value={applicant.nic}
-                  onChange={(e) => updateApplicant('nic', e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  readOnly
+                  title="Managed by the institute — cannot be edited"
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 focus:outline-none"
                 />
               </div>
               <div>
@@ -671,8 +668,9 @@ export default function NewApplicationPage() {
                 <input
                   type="text"
                   value={applicant.batchNumber}
-                  onChange={(e) => updateApplicant('batchNumber', e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  readOnly
+                  title="Managed by the institute — cannot be edited"
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 focus:outline-none"
                 />
               </div>
               <div>
@@ -680,8 +678,9 @@ export default function NewApplicationPage() {
                 <input
                   type="text"
                   value={applicant.intake}
-                  onChange={(e) => updateApplicant('intake', e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  readOnly
+                  title="Managed by the institute — cannot be edited"
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 focus:outline-none"
                 />
               </div>
               <div className="sm:col-span-2">

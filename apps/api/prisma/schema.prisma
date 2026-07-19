@@ -190,6 +190,13 @@ model ApplicationSubject {
   subjectId           String
   caMarks             Int?      // CA marks (mandatory per form)
   category            String    // MEDICAL, REPEAT, 1ST_ATTEMPT (1ST_ATTEMPT for AA only)
+  // Per-subject review outcome. ACTIVE by default; an Exam Division officer may
+  // DECLINE a single wrong subject while forwarding the rest of the application.
+  // Declined subjects are excluded from admissions (the paid total is unchanged).
+  status              String    @default("ACTIVE") // ACTIVE, DECLINED
+  declineReason       String?
+  declinedAt          DateTime?
+  declinedBy          String?   // email/id of the staff who declined it
   upcomingExamIntake  String?   // Upcoming exam intake e.g. "2024-06" (DD MM YYYY on form)
   upcomingExamDate    DateTime? // Auto-filled from ExaminationSchedule
   // Previous exam details (Section 6 of form)

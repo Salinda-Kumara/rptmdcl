@@ -73,8 +73,12 @@ export const staffApi = {
   markAdmissionPrinted: (subjectId: string, printed: boolean) =>
     apiClient.patch(`/applications/admissions/${subjectId}/printed`, { printed }).then((r) => r.data),
 
-  examReview: (id: string, action: 'FORWARD' | 'REJECT', remark?: string) =>
+  examReview: (id: string, action: 'FORWARD' | 'REJECT' | 'RETURN', remark?: string) =>
     apiClient.patch<StaffApplication>(`/applications/${id}/exam-review`, { action, remark }).then((r) => r.data),
+
+  // Exam Division — decline a single subject while forwarding the rest.
+  declineSubject: (id: string, subjectId: string, reason: string) =>
+    apiClient.patch<StaffApplication>(`/applications/${id}/subjects/${subjectId}/decline`, { reason }).then((r) => r.data),
 
   financeReview: (id: string, action: 'APPROVE' | 'REJECT', remark?: string) =>
     apiClient.patch<StaffApplication>(`/applications/${id}/payment-review`, { action, remark }).then((r) => r.data),

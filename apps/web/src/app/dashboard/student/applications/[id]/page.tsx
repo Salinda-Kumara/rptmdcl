@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Printer,
   Loader2,
+  RotateCcw,
 } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
 import { DocumentsCard } from '@/components/student/DocumentsCard';
@@ -50,17 +51,68 @@ export default function ApplicationDetailPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [printing, setPrinting] = useState(false);
+  const [resubmitting, setResubmitting] = useState(false);
+  // Editable copies used only while a RETURNED application is being corrected.
+  const [editContact, setEditContact] = useState<{ permanentAddress: string; postalAddress: string; telephone: string; mobile: string; email: string }>({ permanentAddress: '', postalAddress: '', telephone: '', mobile: '', email: '' });
+  const [editSubjects, setEditSubjects] = useState<Record<string, { caMarks: string; upcomingExamIntake: string; upcomingExamDate: string; previousExamDate: string; previousExamIntake: string; gradeEarned: string }>>({});
+
+  const isReturned = app?.status === 'RETURNED';
 
   const missingDocs: DocumentType[] = app
     ? (REQUIRED_DOCS[app.type] || []).filter((t) => !docs.some((d) => d.documentType === t))
     : [];
 
+  // Seed the editable copies from an application (used when it is RETURNED).
+  const seedEdits = (a: Application) => {
+    const d = (a.applicantDetails ?? {}) as any;
+    setEditContact({
+      permanentAddress: d.permanentAddress ?? '', postalAddress: d.postalAddress ?? '',
+      telephone: d.telephone ?? '', mobile: d.mobile ?? '', email: d.email ?? '',
+    });
+    const iso = (v?: string | null) => (v ? new Date(v).toISOString().slice(0, 10) : '');
+    setEditSubjects(Object.fromEntries((a.applicationSubjects ?? []).map((s) => [s.id, {
+      caMarks: s.caMarks != null ? String(s.caMarks) : '',
+      upcomingExamIntake: s.upcomingExamIntake ?? '',
+      upcomingExamDate: iso(s.upcomingExamDate),
+      previousExamDate: iso(s.previousExamDate),
+      previousExamIntake: s.previousExamIntake ?? '',
+      gradeEarned: s.gradeEarned ?? '',
+    }])));
+  };
+
   useEffect(() => {
     applicationsApi.getMyApplication(id)
-      .then(setApp)
+      .then((a) => { setApp(a); seedEdits(a); })
       .catch(() => setError('Application not found'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const setSub = (sid: string, field: string, value: string) =>
+    setEditSubjects((prev) => ({ ...prev, [sid]: { ...prev[sid], [field]: value } }));
+
+  const handleResubmit = async () => {
+    setResubmitting(true); setError(''); setSuccess('');
+    try {
+      const updated = await applicationsApi.resubmit(id, {
+        applicant: editContact,
+        subjects: Object.entries(editSubjects).map(([sid, v]) => ({
+          id: sid,
+          caMarks: v.caMarks === '' ? undefined : Number(v.caMarks),
+          upcomingExamIntake: v.upcomingExamIntake || undefined,
+          upcomingExamDate: v.upcomingExamDate || undefined,
+          previousExamDate: v.previousExamDate || undefined,
+          previousExamIntake: v.previousExamIntake || undefined,
+          gradeEarned: v.gradeEarned || undefined,
+        })),
+      });
+      setApp(updated); seedEdits(updated);
+      setSuccess('Application corrected and resubmitted.');
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Resubmission failed');
+    } finally {
+      setResubmitting(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (missingDocs.length > 0) {
@@ -171,7 +223,7 @@ export default function ApplicationDetailPage() {
             </div>
 
             {/* Progress timeline */}
-            {!isTerminal && (
+            {!isTerminal && !isReturned && (
               <div className="border-t border-slate-100 px-6 py-5">
                 <div className="flex items-center">
                   {WORKFLOW.map((step, i) => {
@@ -213,10 +265,133 @@ export default function ApplicationDetailPage() {
             </div>
           )}
 
+          {/* Returned for correction */}
+          {isReturned && (
+            <div className="mb-6 flex items-start gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-6 py-4">
+              <RotateCcw className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+              <div>
+                <p className="text-sm font-semibold text-orange-800">Returned for Correction</p>
+                <p className="mt-0.5 text-sm text-orange-700">
+                  The Examination Division asked you to correct some details (see Remarks below). Fix them in the
+                  form below, re-upload any documents if needed, then resubmit.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Two-column body */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Main column */}
             <div className="space-y-6 lg:col-span-2">
+              {/* Correction form — RETURNED only */}
+              {isReturned && (
+                <div className="rounded-2xl border border-orange-200 bg-white shadow-sm">
+                  <div className="border-b border-orange-100 px-6 py-4">
+                    <h3 className="text-sm font-semibold text-slate-900">Correct &amp; Resubmit</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Your name, registration number and NIC are fixed. You can correct contact details and each subject&apos;s data.
+                    </p>
+                  </div>
+                  <div className="space-y-5 p-6">
+                    {/* Contact fields */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {([
+                        ['permanentAddress', 'Permanent Address', 'sm:col-span-2'],
+                        ['postalAddress', 'Postal Address', 'sm:col-span-2'],
+                        ['mobile', 'Mobile', ''],
+                        ['telephone', 'Telephone', ''],
+                        ['email', 'Email', 'sm:col-span-2'],
+                      ] as const).map(([k, label, span]) => (
+                        <div key={k} className={span}>
+                          <label className="mb-1 block text-xs font-medium text-slate-600">{label}</label>
+                          <input
+                            type="text"
+                            value={(editContact as any)[k]}
+                            onChange={(e) => setEditContact((prev) => ({ ...prev, [k]: e.target.value }))}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Per-subject fields */}
+                    <div className="space-y-3">
+                      {app.applicationSubjects.map((s) => {
+                        const v = editSubjects[s.id] ?? { caMarks: '', upcomingExamIntake: '', upcomingExamDate: '', previousExamDate: '', previousExamIntake: '', gradeEarned: '' };
+                        return (
+                          <div key={s.id} className="rounded-xl border border-slate-200 p-4">
+                            <p className="mb-3 text-sm font-semibold text-slate-800">
+                              <span className="text-blue-600">{s.subject.code}</span> — {s.subject.name}
+                              <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">{s.category}</span>
+                            </p>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">CA Marks</label>
+                                <input type="number" min={0} max={100} value={v.caMarks}
+                                  onChange={(e) => setSub(s.id, 'caMarks', e.target.value)}
+                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Upcoming Exam Intake</label>
+                                <input type="text" value={v.upcomingExamIntake}
+                                  onChange={(e) => setSub(s.id, 'upcomingExamIntake', e.target.value)}
+                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Upcoming Exam Date</label>
+                                <input type="date" value={v.upcomingExamDate}
+                                  onChange={(e) => setSub(s.id, 'upcomingExamDate', e.target.value)}
+                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Date of Previous Exam</label>
+                                <input type="date" value={v.previousExamDate}
+                                  onChange={(e) => setSub(s.id, 'previousExamDate', e.target.value)}
+                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Previous Intake</label>
+                                <input type="text" value={v.previousExamIntake}
+                                  onChange={(e) => setSub(s.id, 'previousExamIntake', e.target.value)}
+                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                              </div>
+                              {s.category === 'REPEAT' && (
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned</label>
+                                  <input type="text" value={v.gradeEarned}
+                                    onChange={(e) => setSub(s.id, 'gradeEarned', e.target.value)}
+                                    className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {success && (
+                      <div className="flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+                        <CheckCircle2 className="h-4 w-4" /> {success}
+                      </div>
+                    )}
+                    {error && (
+                      <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                        <AlertCircle className="h-4 w-4" /> {error}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleResubmit}
+                      disabled={resubmitting}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-700 disabled:opacity-50"
+                    >
+                      {resubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      {resubmitting ? 'Resubmitting…' : 'Correct & Resubmit'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Applicant details */}
               {app.applicantDetails && (
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">

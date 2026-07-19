@@ -165,6 +165,10 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
   const [remark, setRemark]     = useState('');
   const [acting, setActing]     = useState<'FORWARD' | 'REJECT' | null>(null);
   const [showReject, setShowReject] = useState(false);
+  const [showReturn, setShowReturn] = useState(false);
+  const [declineFor, setDeclineFor] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState('');
+  const [decliningBusy, setDecliningBusy] = useState(false);
   const [error, setError]       = useState('');
   const [busyDoc, setBusyDoc]   = useState<string | null>(null);
   const [verified, setVerified] = useState<Set<string>>(new Set());
@@ -221,7 +225,9 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
     setOpenSec((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
   /* derived */
-  const subjKeys = (app?.applicationSubjects ?? []).map((s: any) => `s_${s.id}`);
+  // Declined subjects don't need verification and can't be forwarded — only
+  // ACTIVE subjects count toward the checklist.
+  const subjKeys = (app?.applicationSubjects ?? []).filter((s: any) => s.status !== 'DECLINED').map((s: any) => `s_${s.id}`);
   // Medical certificates are shown under their subject, so the flat Attachments
   // list (and its verification count) covers everything else — e.g. the pay slip.
   const attachmentDocs = (app?.documents ?? []).filter((d) => d.documentType !== 'MEDICAL_CERTIFICATE');
@@ -259,16 +265,28 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
     prev.current = new Set(verified);
   }, [verified]); // eslint-disable-line
 
-  const doAction = async (action: 'FORWARD' | 'REJECT') => {
+  const doAction = async (action: 'FORWARD' | 'REJECT' | 'RETURN') => {
     setError('');
-    if (action === 'REJECT' && !remark.trim()) { setError('A remark is required.'); return; }
-    setActing(action);
+    if ((action === 'REJECT' || action === 'RETURN') && !remark.trim()) { setError('A remark is required.'); return; }
+    setActing(action === 'RETURN' ? 'REJECT' : action);
     try {
       const u = await staffApi.examReview(id, action, remark.trim() || undefined);
-      setApp(u); setShowReject(false); setRemark('');
+      setApp(u); setShowReject(false); setShowReturn(false); setRemark('');
     } catch (e: any) {
       setError(e.response?.data?.message?.toString() || 'Action failed');
     } finally { setActing(null); }
+  };
+
+  const doDecline = async (subjectRowId: string) => {
+    setError('');
+    if (!declineReason.trim()) { setError('A reason is required to decline a subject.'); return; }
+    setDecliningBusy(true);
+    try {
+      const u = await staffApi.declineSubject(id, subjectRowId, declineReason.trim());
+      setApp(u); setDeclineFor(null); setDeclineReason('');
+    } catch (e: any) {
+      setError(e.response?.data?.message?.toString() || 'Could not decline the subject');
+    } finally { setDecliningBusy(false); }
   };
 
   const doFinance = async (action: 'APPROVE' | 'REJECT') => {
@@ -487,24 +505,32 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
           >
             {app.applicationSubjects.map((s: any) => {
               const key = `s_${s.id}`;
+              const declined = s.status === 'DECLINED';
               const on  = verified.has(key);
+              const rowClickable = canReview && !declined;
               return (
                 <div
                   key={s.id}
-                  role={canReview ? 'button' : undefined}
-                  tabIndex={canReview ? 0 : undefined}
-                  onClick={canReview ? () => tick(key) : undefined}
-                  onKeyDown={canReview ? (e) => e.key === 'Enter' && tick(key) : undefined}
+                  role={rowClickable ? 'button' : undefined}
+                  tabIndex={rowClickable ? 0 : undefined}
+                  onClick={rowClickable ? () => tick(key) : undefined}
+                  onKeyDown={rowClickable ? (e) => e.key === 'Enter' && tick(key) : undefined}
                   className={`flex items-start gap-4 border-b border-slate-50 px-6 py-4 last:border-0 transition-colors ${
-                    on ? 'bg-emerald-50/50' : canReview ? 'cursor-pointer hover:bg-slate-50' : ''
+                    declined ? 'bg-red-50/40' : on ? 'bg-emerald-50/50' : rowClickable ? 'cursor-pointer hover:bg-slate-50' : ''
                   }`}
                 >
-                  {canReview && <span className="mt-0.5"><Check on={on} /></span>}
+                  {canReview && !declined && <span className="mt-0.5"><Check on={on} /></span>}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold ${on ? 'text-emerald-900' : 'text-slate-900'}`}>
-                      <span className={on ? 'text-emerald-600' : 'text-blue-600'}>{s.subject.code}</span>
+                    <p className={`text-sm font-semibold ${declined ? 'text-slate-500 line-through' : on ? 'text-emerald-900' : 'text-slate-900'}`}>
+                      <span className={declined ? 'text-slate-400' : on ? 'text-emerald-600' : 'text-blue-600'}>{s.subject.code}</span>
                       {' — '}{s.subject.name}
                     </p>
+                    {declined && (
+                      <div className="mt-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs text-red-700">
+                        <span className="font-semibold">Declined</span>
+                        {s.declineReason ? <span> · {s.declineReason}</span> : null}
+                      </div>
+                    )}
                     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                       <span className={`inline-flex items-center rounded px-1.5 py-0.5 font-medium ${on ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                         {s.category}
@@ -542,6 +568,50 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                         </button>
                       </div>
                     ))}
+
+                    {/* Decline this single subject (Exam Division only). */}
+                    {canReview && !declined && (
+                      declineFor === s.id ? (
+                        <div className="mt-2.5 rounded-lg border border-red-200 bg-red-50/60 p-2.5" onClick={(e) => e.stopPropagation()}>
+                          <label className="mb-1 block text-[11px] font-semibold text-red-700">Reason for declining {s.subject.code}</label>
+                          <textarea
+                            value={declineReason}
+                            onChange={(e) => setDeclineReason(e.target.value)}
+                            rows={2}
+                            autoFocus
+                            placeholder="Explain why this subject is being declined…"
+                            className="w-full rounded-lg border border-red-300 px-3 py-2 text-xs focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                          />
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); doDecline(s.id); }}
+                              disabled={decliningBusy || !declineReason.trim()}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {decliningBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                              Confirm Decline
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setDeclineFor(null); setDeclineReason(''); }}
+                              disabled={decliningBusy}
+                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-white"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setDeclineFor(s.id); setDeclineReason(''); setError(''); }}
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50"
+                        >
+                          <XCircle className="h-3.5 w-3.5" /> Decline this subject
+                        </button>
+                      )
+                    )}
                   </div>
                   {on && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />}
                 </div>
@@ -724,7 +794,39 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                   </div>
                 )}
 
-                {!showReject ? (
+                {showReturn ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                        What should the student correct? <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={remark}
+                        onChange={(e) => setRemark(e.target.value)}
+                        rows={3}
+                        placeholder="Describe what is wrong so the student can fix it and resubmit…"
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => doAction('RETURN')}
+                        disabled={acting !== null || !remark.trim()}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-700 disabled:opacity-50"
+                      >
+                        {acting === 'REJECT' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                        Return for Correction
+                      </button>
+                      <button
+                        onClick={() => { setShowReturn(false); setError(''); setRemark(''); }}
+                        disabled={acting !== null}
+                        className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : !showReject ? (
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <button
                       onClick={() => doAction('FORWARD')}
@@ -734,6 +836,13 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                     >
                       {acting === 'FORWARD' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       Forward to Finance
+                    </button>
+                    <button
+                      onClick={() => { setShowReturn(true); setError(''); setRemark(''); }}
+                      disabled={acting !== null}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-white px-5 py-3 text-sm font-bold text-orange-600 transition hover:bg-orange-50 disabled:opacity-50"
+                    >
+                      <RotateCcw className="h-4 w-4" /> Return to Student
                     </button>
                     <button
                       onClick={() => { setShowReject(true); setError(''); }}

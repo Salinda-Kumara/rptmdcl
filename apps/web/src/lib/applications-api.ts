@@ -19,6 +19,25 @@ export interface ApplicationSubject {
   previousExamDate?: string | null;
   previousExamIntake?: string | null;
   gradeEarned?: string | null;
+  // Per-subject review outcome — DECLINED subjects were rejected by the Exam
+  // Division while the rest of the application was forwarded.
+  status?: 'ACTIVE' | 'DECLINED' | string;
+  declineReason?: string | null;
+}
+
+// The editable fields the student may correct when resubmitting a RETURNED
+// application. Subject rows are matched by their id; the set/categories are fixed.
+export interface ResubmitData {
+  applicant?: Partial<ApplicantDetails>;
+  subjects?: Array<{
+    id: string;
+    caMarks?: number;
+    upcomingExamIntake?: string;
+    upcomingExamDate?: string;
+    previousExamDate?: string;
+    previousExamIntake?: string;
+    gradeEarned?: string;
+  }>;
 }
 
 export interface Payment {
@@ -105,6 +124,9 @@ export const applicationsApi = {
       .patch<Application>(`/applications/my/${id}/submit`, { paymentReferenceId })
       .then((r) => r.data),
 
+  resubmit: (id: string, data: ResubmitData) =>
+    apiClient.patch<Application>(`/applications/my/${id}/resubmit`, data).then((r) => r.data),
+
   cancel: (id: string) =>
     apiClient.delete(`/applications/my/${id}`).then((r) => r.data),
 
@@ -188,6 +210,7 @@ export const STATUS_LABELS: Record<string, string> = {
   PAYMENT_VERIFIED: 'Payment Verified',
   PAYMENT_REJECTED: 'Payment Rejected',
   UNDER_REVIEW: 'Under Review',
+  RETURNED: 'Returned for Correction',
   APPROVED: 'Approved',
   REJECTED: 'Rejected',
   CANCELLED: 'Cancelled',
@@ -200,6 +223,7 @@ export const STATUS_COLORS: Record<string, string> = {
   PAYMENT_VERIFIED: 'bg-emerald-100 text-emerald-700',
   PAYMENT_REJECTED: 'bg-red-100 text-red-700',
   UNDER_REVIEW: 'bg-purple-100 text-purple-700',
+  RETURNED: 'bg-orange-100 text-orange-700',
   APPROVED: 'bg-green-100 text-green-700',
   REJECTED: 'bg-red-100 text-red-700',
   CANCELLED: 'bg-gray-100 text-gray-500',

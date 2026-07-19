@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '@/prisma/prisma.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto, DeclineSubjectDto, ResubmitApplicationDto } from './dtos/application.dto';
 
 // Fee structure in LKR (whole rupees, as per the physical form)
 // Medical (re-sit on medical ground): LKR 5,200 per subject
@@ -330,7 +330,35 @@ export class ApplicationsService {
       return this.findOneStaff(id);
     }
 
+    // RETURN → hand the application back to the student for correction. The exam
+    // stage stays pending so it comes back to this queue once resubmitted.
+    if (dto.action === 'RETURN') {
+      if (!dto.remark || !dto.remark.trim()) {
+        throw new BadRequestException('A remark is required when returning an application for correction');
+      }
+      await this.prisma.$transaction([
+        this.prisma.application.update({ where: { id }, data: { status: 'RETURNED' } }),
+        this.prisma.approval.updateMany({
+          where: { applicationId: id, stage: 1 },
+          data: { status: 'PENDING', approvedBy: null, approvedAt: null },
+        }),
+        this.prisma.remark.create({
+          data: { applicationId: id, userId, content: dto.remark.trim() },
+        }),
+      ]);
+      return this.findOneStaff(id);
+    }
+
     // FORWARD → mark exam division stage approved and open the finance stage.
+    // At least one subject must remain ACTIVE (not declined) to forward.
+    const activeCount = await this.prisma.applicationSubject.count({
+      where: { applicationId: id, status: 'ACTIVE' },
+    });
+    if (activeCount === 0) {
+      throw new BadRequestException(
+        'All subjects have been declined. Reject the application instead of forwarding it.',
+      );
+    }
     const ops: any[] = [
       this.prisma.application.update({ where: { id }, data: { status: 'PAYMENT_PENDING' } }),
       this.prisma.approval.updateMany({
@@ -350,6 +378,110 @@ export class ApplicationsService {
     }
     await this.prisma.$transaction(ops);
     return this.findOneStaff(id);
+  }
+
+  // Exam Division — decline a single subject on a submitted application while
+  // keeping the rest. The subject is marked DECLINED (excluded from admissions);
+  // the paid total is intentionally left unchanged. A reason is recorded.
+  async declineSubject(userId: string, id: string, subjectRowId: string, dto: DeclineSubjectDto) {
+    if (!dto.reason || !dto.reason.trim()) {
+      throw new BadRequestException('A reason is required to decline a subject');
+    }
+    const application = await this.prisma.application.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+    if (application.status !== 'SUBMITTED') {
+      throw new BadRequestException('Subjects can only be declined while the application awaits Exam Division verification');
+    }
+
+    const row = await this.prisma.applicationSubject.findFirst({
+      where: { id: subjectRowId, applicationId: id },
+      include: { subject: { select: { code: true } } },
+    });
+    if (!row) throw new NotFoundException('Subject not found on this application');
+    if (row.status === 'DECLINED') {
+      throw new BadRequestException('This subject has already been declined');
+    }
+
+    const actor = await this.prisma.user.findUnique({
+      where: { id: userId }, include: { staffUser: true },
+    });
+    const actorName = actor?.staffUser?.name ?? actor?.email ?? userId;
+
+    await this.prisma.$transaction([
+      this.prisma.applicationSubject.update({
+        where: { id: subjectRowId },
+        data: { status: 'DECLINED', declineReason: dto.reason.trim(), declinedAt: new Date(), declinedBy: actorName },
+      }),
+      this.prisma.remark.create({
+        data: { applicationId: id, userId, content: `Declined subject ${row.subject?.code ?? subjectRowId}: ${dto.reason.trim()}` },
+      }),
+    ]);
+    return this.findOneStaff(id);
+  }
+
+  // Student — apply corrections to a RETURNED application and resubmit it. The
+  // subject set and categories (which set the fee) are fixed; only data fields
+  // and the applicant snapshot may change. Resubmitting sends it back to the
+  // Exam Division queue (status SUBMITTED). The serial number is preserved.
+  async resubmit(userId: string, id: string, dto: ResubmitApplicationDto) {
+    const student = await this.prisma.student.findFirst({ where: { userId } });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const application = await this.prisma.application.findFirst({
+      where: { id, studentId: student.id, deletedAt: null },
+      include: { applicationSubjects: true },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+    if (application.status !== 'RETURNED') {
+      throw new BadRequestException('Only a returned application can be resubmitted');
+    }
+
+    const ops: any[] = [];
+
+    // Merge the applicant snapshot with any corrected fields. Identity fields are
+    // kept from the existing snapshot (the student cannot change them).
+    if (dto.applicant) {
+      const cur: any = (application.applicantDetails as any) ?? {};
+      const a = dto.applicant;
+      const merged = {
+        ...cur,
+        fullName: a.fullName ?? cur.fullName,
+        nameWithInitials: a.nameWithInitials ?? cur.nameWithInitials,
+        permanentAddress: a.permanentAddress ?? cur.permanentAddress,
+        postalAddress: a.postalAddress ?? cur.postalAddress,
+        telephone: a.telephone ?? cur.telephone,
+        mobile: a.mobile ?? cur.mobile,
+        email: a.email ?? cur.email,
+      };
+      ops.push(this.prisma.application.update({ where: { id }, data: { applicantDetails: merged } }));
+    }
+
+    // Update each named subject row's editable data fields (row must belong here).
+    const ownRowIds = new Set(application.applicationSubjects.map((s) => s.id));
+    for (const s of dto.subjects ?? []) {
+      if (!ownRowIds.has(s.id)) throw new BadRequestException('Subject does not belong to this application');
+      ops.push(this.prisma.applicationSubject.update({
+        where: { id: s.id },
+        data: {
+          ...(s.caMarks !== undefined ? { caMarks: s.caMarks } : {}),
+          ...(s.upcomingExamIntake !== undefined ? { upcomingExamIntake: s.upcomingExamIntake } : {}),
+          ...(s.upcomingExamDate !== undefined ? { upcomingExamDate: s.upcomingExamDate ? new Date(s.upcomingExamDate) : null } : {}),
+          ...(s.previousExamDate !== undefined ? { previousExamDate: s.previousExamDate ? new Date(s.previousExamDate) : null } : {}),
+          ...(s.previousExamIntake !== undefined ? { previousExamIntake: s.previousExamIntake } : {}),
+          ...(s.gradeEarned !== undefined ? { gradeEarned: s.gradeEarned } : {}),
+        },
+      }));
+    }
+
+    ops.push(
+      this.prisma.application.update({ where: { id }, data: { status: 'SUBMITTED', submittedAt: new Date() } }),
+      this.prisma.remark.create({ data: { applicationId: id, userId, content: 'Resubmitted by student after correction.' } }),
+    );
+
+    await this.prisma.$transaction(ops);
+    return this.findOne(userId, id);
   }
 
   // Stage 2 — Finance verifies the payment. They may approve (payment confirmed)
@@ -540,7 +672,8 @@ export class ApplicationsService {
       where: { deletedAt: null, status: 'APPROVED' },
       include: {
         student: true,
-        applicationSubjects: { include: { subject: true } },
+        // Declined subjects are not admitted — only ACTIVE ones appear here.
+        applicationSubjects: { where: { status: 'ACTIVE' }, include: { subject: true } },
         payment: true,
         approvals: true,
       },
