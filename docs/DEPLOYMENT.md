@@ -97,6 +97,90 @@ The application is now live! Open a web browser on any machine in the network an
 - **Web Portal:** `http://<HOST_ADDR>:3000`
 - **API Base URL:** `http://<HOST_ADDR>:3001/api/v1`
 
+## 6. Public Access: Domain + HTTPS via Cloudflare Tunnel
+
+The steps above expose the app on a LAN IP over plain HTTP. To publish it on a
+real domain with HTTPS — **without opening any inbound ports or needing a public
+static IP** — put an nginx reverse proxy in front of the containers and connect
+it to Cloudflare with a Tunnel.
+
+```
+Browser ──HTTPS──► Cloudflare edge ──Tunnel(outbound)──► cloudflared ──► nginx ──► web:3000
+                    (your domain)                                          └──► api:3001  (/api)
+```
+
+Two files in the repo make this a drop-in overlay on the deployment stack:
+
+- [`docker/nginx.conf`](../docker/nginx.conf) — serves the web app at `/` and
+  proxies `/api` to the API, so everything is **one origin** (no CORS, no second
+  hostname).
+- [`docker-compose.public.yml`](../docker-compose.public.yml) — adds the `nginx`
+  and `cloudflared` services and points the web/API at the domain.
+
+### Prerequisites
+
+- A domain added to your Cloudflare account (its nameservers point to Cloudflare).
+- A free [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) account.
+
+### 6.1 Create the Tunnel in Cloudflare
+
+1. In the Zero Trust dashboard, go to **Networks → Tunnels → Create a tunnel**.
+2. Choose **Cloudflared**, name it (e.g. `ermas`), and **Save**.
+3. On the "Install connector" screen, copy the **tunnel token** (the long string
+   after `--token`). You do **not** need to run the install command shown — the
+   `cloudflared` container uses this token.
+4. Open the tunnel's **Public Hostname** tab and **Add a public hostname**:
+   - **Subdomain/Domain:** the address users will visit, e.g. `ermas.example.com`
+   - **Service Type:** `HTTP`
+   - **URL:** `nginx:80`  (the tunnel runs on the same Docker network as nginx)
+
+   Cloudflare creates the DNS record automatically.
+
+### 6.2 Configure `.env`
+
+Add the domain and tunnel token to your existing `.env`:
+
+```bash
+PUBLIC_DOMAIN=ermas.example.com
+CF_TUNNEL_TOKEN=<the tunnel token you copied>
+```
+
+### 6.3 Build and start with the overlay
+
+Because `NEXT_PUBLIC_API_URL` is baked into the web bundle at build time, the web
+image must be **rebuilt** when switching to the domain:
+
+```bash
+docker compose -f docker-compose.deploy.yml -f docker-compose.public.yml up -d --build
+```
+
+Run every later command with **both** `-f` files so the overlay stays applied,
+e.g. deploying updates:
+
+```bash
+docker compose -f docker-compose.deploy.yml -f docker-compose.public.yml up -d --build
+```
+
+### 6.4 Verify
+
+- Visit `https://ermas.example.com` — the login page should load over HTTPS.
+- `docker compose -f docker-compose.deploy.yml -f docker-compose.public.yml logs -f cloudflared`
+  should show the tunnel registering connections.
+- In DevTools → Network, the login request should go to
+  `https://ermas.example.com/api/v1/...` and return `200/201`.
+
+> The published site now works **only** over the domain. The direct
+> `http://<HOST_ADDR>:3000` URL still answers on the LAN, but the web bundle is
+> built for the domain — use the domain for real users. The server needs no
+> inbound firewall rules; the tunnel connection is outbound only.
+
+### 6.5 (Optional) Lock it down with Zero Trust Access
+
+To require a login before anyone can reach the app (useful while testing or for
+staff-only sites), add an **Access → Applications → Self-hosted** policy in the
+Zero Trust dashboard for `ermas.example.com` (e.g. allow specific emails or a
+one-time PIN). Cloudflare then gates the domain in front of the app's own login.
+
 ## Maintenance Commands
 
 **View Live Logs:**

@@ -1,0 +1,47 @@
+# Public-access overlay for docker-compose.deploy.yml.
+#
+# Adds a same-origin nginx reverse proxy (web at /, API at /api) and a
+# Cloudflare Tunnel so the app is reachable on a real domain over HTTPS with
+# NO inbound ports opened on the server. See docs/DEPLOYMENT.md.
+#
+#   docker compose -f docker-compose.deploy.yml -f docker-compose.public.yml up -d --build
+#
+# Requires PUBLIC_DOMAIN and CF_TUNNEL_TOKEN in .env.
+
+services:
+  web:
+    build:
+      args:
+        # Same-origin: the browser reaches the API under /api on the domain,
+        # so a relative URL is baked into the client bundle. This overrides the
+        # HOST_ADDR-based value from docker-compose.deploy.yml.
+        NEXT_PUBLIC_API_URL: /api/v1
+    environment:
+      NEXT_PUBLIC_API_URL: /api/v1
+
+  api:
+    environment:
+      # Requests are same-origin through nginx, but set this to the public URL
+      # for defence in depth. Overrides the HOST_ADDR-based value.
+      CORS_ORIGIN: https://${PUBLIC_DOMAIN}
+
+  nginx:
+    image: nginx:alpine
+    container_name: ermas-nginx
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+      - api
+    restart: unless-stopped
+    networks: [ermas]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ermas-cloudflared
+    # Token from the Cloudflare Zero Trust dashboard (Networks -> Tunnels).
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    depends_on:
+      - nginx
+    restart: unless-stopped
+    networks: [ermas]
