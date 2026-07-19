@@ -15,7 +15,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '@/auth/guards/permissions.guard';
 import { RequirePermission } from '@/auth/decorators/require-permission.decorator';
 import { ApplicationsService } from './applications.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto, DeclineSubjectDto, ResubmitApplicationDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto, FinalRejectDto, BulkApproveDto, DeclineSubjectDto, ResubmitApplicationDto } from './dtos/application.dto';
 
 @ApiTags('Applications')
 @Controller('applications')
@@ -165,6 +165,25 @@ export class ApplicationsController {
   @ApiOperation({ summary: 'Exam Registrar: final approval of a payment-verified application (staff)' })
   finalApprove(@Req() req: any, @Param('id') id: string, @Body() dto: FinalApprovalDto) {
     return this.applicationsService.registrarApprove(req.user.id, id, dto);
+  }
+
+  // Stage 3 — Exam Registrar approves several applications at once. Declared
+  // before ':id/final-reject' pattern isn't needed, but keep bulk on a static path.
+  @Patch('final-approve/bulk')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('approvals', 'FULL')
+  @ApiOperation({ summary: 'Exam Registrar: approve multiple payment-verified applications (staff)' })
+  finalApproveBulk(@Req() req: any, @Body() dto: BulkApproveDto) {
+    return this.applicationsService.registrarApproveBulk(req.user.id, dto);
+  }
+
+  // Stage 3 — Exam Registrar rejects a payment-verified application.
+  @Patch(':id/final-reject')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('approvals', 'FULL')
+  @ApiOperation({ summary: 'Exam Registrar: reject a payment-verified application (staff)' })
+  finalReject(@Req() req: any, @Param('id') id: string, @Body() dto: FinalRejectDto) {
+    return this.applicationsService.registrarReject(req.user.id, id, dto);
   }
 
   // Roll an application back one stage (correct a wrongly-processed application).

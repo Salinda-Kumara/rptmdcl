@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { PrismaService } from '@/prisma/prisma.service';
-import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto, DeclineSubjectDto, ResubmitApplicationDto } from './dtos/application.dto';
+import { CreateApplicationDto, SubmitApplicationDto, ReviewActionDto, PaymentReviewDto, RollbackDto, FinalApprovalDto, FinalRejectDto, BulkApproveDto, DeclineSubjectDto, ResubmitApplicationDto } from './dtos/application.dto';
 
 // Fee structure in LKR (whole rupees, as per the physical form)
 // Medical (re-sit on medical ground): LKR 5,200 per subject
@@ -586,6 +586,66 @@ export class ApplicationsService {
     }
     await this.prisma.$transaction(ops);
     return this.findOneStaff(id);
+  }
+
+  // Stage 3 — Exam Registrar rejects a payment-verified application. A remark is
+  // required; the application moves to REJECTED and stage 3 is marked rejected.
+  async registrarReject(userId: string, id: string, dto: FinalRejectDto) {
+    if (!dto.remark || !dto.remark.trim()) {
+      throw new BadRequestException('A remark is required when rejecting an application');
+    }
+    const application = await this.prisma.application.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!application) throw new NotFoundException('Application not found');
+    if (application.status !== 'PAYMENT_VERIFIED') {
+      throw new BadRequestException(
+        'Only payment-verified applications awaiting final approval can be rejected here',
+      );
+    }
+    await this.prisma.$transaction([
+      this.prisma.application.update({ where: { id }, data: { status: 'REJECTED' } }),
+      this.prisma.approval.upsert({
+        where: { applicationId_stage: { applicationId: id, stage: 3 } },
+        update: { status: 'REJECTED', approvedBy: userId, approvedAt: new Date() },
+        create: { applicationId: id, stage: 3, status: 'REJECTED', approvedBy: userId, approvedAt: new Date() },
+      }),
+      this.prisma.remark.create({ data: { applicationId: id, userId, content: dto.remark.trim() } }),
+    ]);
+    return this.findOneStaff(id);
+  }
+
+  // Stage 3 — approve several payment-verified applications at once. Each is
+  // approved individually; ids not in PAYMENT_VERIFIED are skipped and reported.
+  async registrarApproveBulk(userId: string, dto: BulkApproveDto) {
+    const ids = Array.from(new Set(dto.ids ?? [])).filter(Boolean);
+    if (ids.length === 0) throw new BadRequestException('No applications selected');
+
+    const eligible = await this.prisma.application.findMany({
+      where: { id: { in: ids }, deletedAt: null, status: 'PAYMENT_VERIFIED' },
+      select: { id: true },
+    });
+    const eligibleIds = eligible.map((e) => e.id);
+    const remark = dto.remark && dto.remark.trim() ? dto.remark.trim() : null;
+
+    const ops: any[] = [];
+    for (const id of eligibleIds) {
+      ops.push(
+        this.prisma.application.update({ where: { id }, data: { status: 'APPROVED' } }),
+        this.prisma.approval.upsert({
+          where: { applicationId_stage: { applicationId: id, stage: 3 } },
+          update: { status: 'APPROVED', approvedBy: userId, approvedAt: new Date() },
+          create: { applicationId: id, stage: 3, status: 'APPROVED', approvedBy: userId, approvedAt: new Date() },
+        }),
+      );
+      if (remark) ops.push(this.prisma.remark.create({ data: { applicationId: id, userId, content: remark } }));
+    }
+    if (ops.length) await this.prisma.$transaction(ops);
+
+    return {
+      approved: eligibleIds,
+      skipped: ids.filter((id) => !eligibleIds.includes(id)),
+    };
   }
 
   async cancel(userId: string, id: string) {

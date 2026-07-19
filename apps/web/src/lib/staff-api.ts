@@ -87,6 +87,14 @@ export const staffApi = {
   finalApprove: (id: string, remark?: string) =>
     apiClient.patch<StaffApplication>(`/applications/${id}/final-approve`, { remark }).then((r) => r.data),
 
+  // Stage 3 — reject a payment-verified application (remark required).
+  finalReject: (id: string, remark: string) =>
+    apiClient.patch<StaffApplication>(`/applications/${id}/final-reject`, { remark }).then((r) => r.data),
+
+  // Stage 3 — approve several applications at once.
+  finalApproveBulk: (ids: string[], remark?: string) =>
+    apiClient.patch<{ approved: string[]; skipped: string[] }>(`/applications/final-approve/bulk`, { ids, remark }).then((r) => r.data),
+
   // Roll an application back to its previous status (requires the `rollback`
   // permission and the acting user's password for confirmation).
   rollback: (id: string, password: string, remark?: string) =>

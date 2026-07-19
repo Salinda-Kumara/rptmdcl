@@ -238,6 +238,24 @@ export class FinalApprovalDto {
   remark?: string;
 }
 
+// Stage 3 — Exam Registrar rejects a payment-verified application (remark required).
+export class FinalRejectDto {
+  @IsString()
+  @IsNotEmpty()
+  remark: string;
+}
+
+// Stage 3 — Exam Registrar approves several applications at once.
+export class BulkApproveDto {
+  @IsArray()
+  @IsString({ each: true })
+  ids: string[];
+
+  @IsOptional()
+  @IsString()
+  remark?: string;
+}
+
 // Roll an application back one stage (e.g. a wrongly-accepted application).
 // The acting user must re-enter their password to confirm this destructive action.
 export class RollbackDto {

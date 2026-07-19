@@ -312,6 +312,18 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
     } finally { setActing(null); }
   };
 
+  const doFinalReject = async () => {
+    setError('');
+    if (!remark.trim()) { setError('A remark is required.'); return; }
+    setActing('REJECT');
+    try {
+      const u = await staffApi.finalReject(id, remark.trim());
+      setApp(u); setShowReject(false); setRemark('');
+    } catch (e: any) {
+      setError(e.response?.data?.message?.toString() || 'Rejection failed');
+    } finally { setActing(null); }
+  };
+
   const doRollback = async () => {
     setError('');
     if (!rollbackPassword) { setError('Please enter your password to confirm.'); return; }
@@ -989,25 +1001,69 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                   </div>
                 )}
 
-                <div className="mb-3">
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">Remark (optional)</label>
-                  <textarea
-                    value={remark}
-                    onChange={(e) => setRemark(e.target.value)}
-                    rows={2}
-                    placeholder="Add an optional note with the approval…"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                  />
-                </div>
-
-                <button
-                  onClick={doApprove}
-                  disabled={acting !== null}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {acting === 'FORWARD' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                  Approve Application
-                </button>
+                {!showReject ? (
+                  <>
+                    <div className="mb-3">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-700">Remark (optional)</label>
+                      <textarea
+                        value={remark}
+                        onChange={(e) => setRemark(e.target.value)}
+                        rows={2}
+                        placeholder="Add an optional note with the approval…"
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <button
+                        onClick={doApprove}
+                        disabled={acting !== null}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {acting === 'FORWARD' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                        Approve Application
+                      </button>
+                      <button
+                        onClick={() => { setShowReject(true); setError(''); setRemark(''); }}
+                        disabled={acting !== null}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <XCircle className="h-4 w-4" /> Reject Application
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                        Reason for rejection <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={remark}
+                        onChange={(e) => setRemark(e.target.value)}
+                        rows={3}
+                        placeholder="Explain why this application is being rejected…"
+                        className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={doFinalReject}
+                        disabled={acting !== null || !remark.trim()}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {acting === 'REJECT' ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                        Confirm Rejection
+                      </button>
+                      <button
+                        onClick={() => { setShowReject(false); setError(''); setRemark(''); }}
+                        disabled={acting !== null}
+                        className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

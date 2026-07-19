@@ -98,6 +98,14 @@ export function ApplicationsPanel({ onNavigate }: Props) {
   // All-tab column filter: a specific stage (ColKey) or a whole group ('ex' | 'fi').
   const [colFilter, setColFilter] = useState<ColKey | 'ex' | 'fi' | null>(null);
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
+  // Final-approval bulk / per-row actions (Awaiting Final Approval tab).
+  const canFinalApprove = isAdmin || permissions.approvals === 'FULL';
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [rejectFor, setRejectFor] = useState<string | null>(null);
+  const [rejectRemark, setRejectRemark] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -108,6 +116,11 @@ export function ApplicationsPanel({ onNavigate }: Props) {
   }, [dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Reset final-approval selection/reject state when leaving the registrar tab.
+  useEffect(() => {
+    if (tab !== 'registrar') { setSelected(new Set()); setRejectFor(null); setRejectRemark(''); setActionError(''); }
+  }, [tab]);
 
   const filtered = all.filter((app) => {
     if (typeFilter && app.type !== typeFilter) return false;
@@ -148,6 +161,45 @@ export function ApplicationsPanel({ onNavigate }: Props) {
     } finally {
       setExporting(null);
     }
+  };
+
+  // ── Final-approval actions ──────────────────────────────────────────────
+  const clearActionState = () => { setSelected(new Set()); setRejectFor(null); setRejectRemark(''); setActionError(''); };
+  const toggleSel = (id: string) =>
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleSelAll = (rows: StaffApplication[]) =>
+    setSelected((prev) => (prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.id))));
+
+  const doBulkApprove = async () => {
+    if (selected.size === 0 || bulkBusy) return;
+    setBulkBusy(true); setActionError('');
+    try {
+      await staffApi.finalApproveBulk([...selected]);
+      clearActionState(); load();
+    } catch (e: any) {
+      setActionError(e.response?.data?.message?.toString() || 'Bulk approval failed');
+    } finally { setBulkBusy(false); }
+  };
+  const doRowApprove = async (id: string) => {
+    if (rowBusy) return;
+    setRowBusy(id); setActionError('');
+    try {
+      await staffApi.finalApprove(id);
+      setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+      load();
+    } catch (e: any) {
+      setActionError(e.response?.data?.message?.toString() || 'Approval failed');
+    } finally { setRowBusy(null); }
+  };
+  const doRowReject = async (id: string) => {
+    if (rowBusy || !rejectRemark.trim()) return;
+    setRowBusy(id); setActionError('');
+    try {
+      await staffApi.finalReject(id, rejectRemark.trim());
+      clearActionState(); load();
+    } catch (e: any) {
+      setActionError(e.response?.data?.message?.toString() || 'Rejection failed');
+    } finally { setRowBusy(null); }
   };
 
   // Applications that map to the Approved column (PAYMENT_VERIFIED + APPROVED).
@@ -406,6 +458,149 @@ export function ApplicationsPanel({ onNavigate }: Props) {
     );
   };
 
+  // Awaiting Final Approval — select-all + bulk approve, and per-row approve/reject.
+  const renderRegistrarTable = (rows: StaffApplication[]) => {
+    if (loading) return renderAppTable(rows, '', '');
+    if (rows.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-gray-700 bg-white dark:bg-gray-900 py-20 text-center">
+          <Inbox className="h-10 w-10 text-slate-300 dark:text-gray-600" />
+          <p className="mt-3 text-sm font-medium text-slate-500 dark:text-gray-400">No applications awaiting final approval</p>
+        </div>
+      );
+    }
+    const allSelected = selected.size === rows.length;
+    return (
+      <div className="space-y-3">
+        {actionError && (
+          <div className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700"><XCircle className="h-4 w-4 shrink-0" /> {actionError}</div>
+        )}
+        {/* Bulk action bar */}
+        {canFinalApprove && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5">
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input type="checkbox" checked={allSelected} onChange={() => toggleSelAll(rows)}
+                className="h-4 w-4 accent-emerald-600" />
+              Select all ({rows.length})
+            </label>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-500">{selected.size} selected</span>
+              <button
+                onClick={doBulkApprove}
+                disabled={selected.size === 0 || bulkBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                Approve selected
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 dark:border-gray-800 bg-slate-50 dark:bg-gray-800/60 text-left">
+                {canFinalApprove && (
+                  <th className="px-4 py-2.5 w-8">
+                    <input type="checkbox" checked={allSelected} onChange={() => toggleSelAll(rows)} className="h-4 w-4 accent-emerald-600" />
+                  </th>
+                )}
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Serial No.</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Registration No.</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Student</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Type</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 text-center">Subjects</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500 text-right">Fee</th>
+                {canFinalApprove && <th className="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-gray-500">Actions</th>}
+                <th className="w-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((app, i) => {
+                const on = selected.has(app.id);
+                const rejecting = rejectFor === app.id;
+                return (
+                  <React.Fragment key={app.id}>
+                    <tr onClick={() => onNavigate('app-detail', app.id)}
+                      className={`cursor-pointer border-t border-slate-100 dark:border-gray-800 transition-colors ${on ? 'bg-emerald-50/50' : i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-slate-50/50 dark:bg-gray-900/60'} hover:bg-emerald-50/40 dark:hover:bg-emerald-900/10`}>
+                      {canFinalApprove && (
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={on} onChange={() => toggleSel(app.id)} className="h-4 w-4 accent-emerald-600" />
+                        </td>
+                      )}
+                      <td className="px-4 py-3"><span className="rounded bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 dark:text-indigo-400">{app.serialNumber || '—'}</span></td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700 dark:text-gray-300">{app.student?.registrationNumber || '—'}</td>
+                      <td className="px-4 py-3"><p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{app.student?.fullName || '—'}</p><p className="text-[10px] text-slate-400 dark:text-gray-600">{app.student?.batchNumber}</p></td>
+                      <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${app.type === 'MEDICAL' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>{applicationTypeLabel(app)}</span></td>
+                      <td className="px-4 py-3 text-center text-xs font-semibold text-slate-700 dark:text-gray-300">{app.applicationSubjects?.length ?? 0}</td>
+                      <td className="px-4 py-3 text-right text-xs font-bold text-slate-800 dark:text-gray-200">{formatFee(app.totalFee)}</td>
+                      {canFinalApprove && (
+                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => doRowApprove(app.id)}
+                              disabled={rowBusy !== null}
+                              title="Approve"
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {rowBusy === app.id && !rejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => { setRejectFor(rejecting ? null : app.id); setRejectRemark(''); setActionError(''); }}
+                              disabled={rowBusy !== null}
+                              title="Reject"
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              <XCircle className="h-3.5 w-3.5" /> Reject
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                      <td className="pr-3 text-slate-300 dark:text-gray-600"><ChevronRight className="h-4 w-4" /></td>
+                    </tr>
+                    {rejecting && canFinalApprove && (
+                      <tr className="bg-red-50/40">
+                        <td colSpan={canFinalApprove ? 9 : 8} className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <label className="mb-1 block text-xs font-semibold text-red-700">Reason for rejecting {app.serialNumber || 'this application'} <span className="text-red-500">*</span></label>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              value={rejectRemark}
+                              onChange={(e) => setRejectRemark(e.target.value)}
+                              autoFocus
+                              placeholder="Explain why this application is being rejected…"
+                              className="min-w-[240px] flex-1 rounded-lg border border-red-300 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                            />
+                            <button
+                              onClick={() => doRowReject(app.id)}
+                              disabled={rowBusy !== null || !rejectRemark.trim()}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {rowBusy === app.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                              Confirm Rejection
+                            </button>
+                            <button
+                              onClick={() => { setRejectFor(null); setRejectRemark(''); }}
+                              disabled={rowBusy !== null}
+                              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-white"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* Header */}
@@ -605,7 +800,7 @@ export function ApplicationsPanel({ onNavigate }: Props) {
       {tab === 'finance' && renderAppTable(financeApps, 'hover:bg-amber-50/50 dark:hover:bg-amber-900/10', 'No applications pending payment verification')}
 
       {/* ── Tab: Awaiting Final Approval ── */}
-      {tab === 'registrar' && renderAppTable(registrarApps, 'hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10', 'No applications awaiting final approval')}
+      {tab === 'registrar' && renderRegistrarTable(registrarApps)}
 
       {/* ── Tab: Approved ── */}
       {tab === 'approved' && renderAppTable(approvedList, 'hover:bg-teal-50/50 dark:hover:bg-teal-900/10', 'No approved applications yet')}
