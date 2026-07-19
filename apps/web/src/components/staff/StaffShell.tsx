@@ -1,23 +1,33 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
   LayoutDashboard, FileText, CalendarDays, GraduationCap,
   BarChart3, LogOut, Menu, X, Crown, UserSquare2,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
 import { useMyPermissions, can } from '@/lib/permissions';
-import { DashboardPanel } from './panels/DashboardPanel';
-import { ApplicationsPanel } from './panels/ApplicationsPanel';
-import { ApplicationDetailPanel } from './panels/ApplicationDetailPanel';
-import { ReportsPanel } from '@/components/admin/panels/ReportsPanel';
-import { ExamSchedulesPanel } from '@/components/admin/panels/ExamSchedulesPanel';
-import { ScheduleDetailPanel } from '@/components/admin/panels/ScheduleDetailPanel';
-import { AdmissionsPanel } from '@/components/admin/panels/AdmissionsPanel';
-import { StudentsPanel } from '@/components/admin/panels/StudentsPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
+
+// Default dashboard is eager (shown first); other panels lazy-load on demand,
+// so their JS downloads only when that view is opened.
+import { DashboardPanel } from './panels/DashboardPanel';
+
+const PanelFallback = () => (
+  <div className="flex items-center justify-center py-20 text-slate-400">
+    <Loader2 className="h-6 w-6 animate-spin" />
+  </div>
+);
+const ApplicationsPanel      = dynamic(() => import('./panels/ApplicationsPanel').then((m) => m.ApplicationsPanel), { loading: PanelFallback, ssr: false });
+const ApplicationDetailPanel = dynamic(() => import('./panels/ApplicationDetailPanel').then((m) => m.ApplicationDetailPanel), { loading: PanelFallback, ssr: false });
+const ReportsPanel           = dynamic(() => import('@/components/admin/panels/ReportsPanel').then((m) => m.ReportsPanel), { loading: PanelFallback, ssr: false });
+const ExamSchedulesPanel     = dynamic(() => import('@/components/admin/panels/ExamSchedulesPanel').then((m) => m.ExamSchedulesPanel), { loading: PanelFallback, ssr: false });
+const ScheduleDetailPanel    = dynamic(() => import('@/components/admin/panels/ScheduleDetailPanel').then((m) => m.ScheduleDetailPanel), { loading: PanelFallback, ssr: false });
+const AdmissionsPanel        = dynamic(() => import('@/components/admin/panels/AdmissionsPanel').then((m) => m.AdmissionsPanel), { loading: PanelFallback, ssr: false });
+const StudentsPanel          = dynamic(() => import('@/components/admin/panels/StudentsPanel').then((m) => m.StudentsPanel), { loading: PanelFallback, ssr: false });
 
 type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'admissions' | 'students' | 'reports' | 'admin';
 
