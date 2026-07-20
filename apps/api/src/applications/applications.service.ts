@@ -142,6 +142,10 @@ export class ApplicationsService {
             previousExamDate: s.previousExamDate ? new Date(s.previousExamDate) : undefined,
             previousExamIntake: s.previousExamIntake,
             gradeEarned: s.gradeEarned,
+            secondAttemptDate: s.secondAttemptDate ? new Date(s.secondAttemptDate) : undefined,
+            secondAttemptIntake: s.secondAttemptIntake,
+            secondAttemptGrade: s.secondAttemptGrade,
+            medicalApprovalSerial: s.medicalApprovalSerial,
           })),
         },
       },
@@ -179,7 +183,11 @@ export class ApplicationsService {
         payment: true,
         approvals: true,
         remarks: { include: { user: { select: { email: true, staffUser: true } } } },
-        documents: true,
+        // Soft-deleted attachments (e.g. replaced during editing) must never
+        // reach the client — their files are gone from storage, so surfacing
+        // them causes a 404 when something (like the print packet) tries to
+        // download one.
+        documents: { where: { deletedAt: null } },
       },
     });
 
@@ -471,6 +479,10 @@ export class ApplicationsService {
           ...(s.previousExamDate !== undefined ? { previousExamDate: s.previousExamDate ? new Date(s.previousExamDate) : null } : {}),
           ...(s.previousExamIntake !== undefined ? { previousExamIntake: s.previousExamIntake } : {}),
           ...(s.gradeEarned !== undefined ? { gradeEarned: s.gradeEarned } : {}),
+          ...(s.secondAttemptDate !== undefined ? { secondAttemptDate: s.secondAttemptDate ? new Date(s.secondAttemptDate) : null } : {}),
+          ...(s.secondAttemptIntake !== undefined ? { secondAttemptIntake: s.secondAttemptIntake } : {}),
+          ...(s.secondAttemptGrade !== undefined ? { secondAttemptGrade: s.secondAttemptGrade } : {}),
+          ...(s.medicalApprovalSerial !== undefined ? { medicalApprovalSerial: s.medicalApprovalSerial } : {}),
         },
       }));
     }
@@ -936,7 +948,11 @@ export class ApplicationsService {
         payment: true,
         approvals: true,
         remarks: { include: { user: { select: { email: true, staffUser: true } } } },
-        documents: true,
+        // Soft-deleted attachments (e.g. replaced during editing) must never
+        // reach the client — their files are gone from storage, so surfacing
+        // them causes a 404 when something (like the print packet) tries to
+        // download one.
+        documents: { where: { deletedAt: null } },
       },
     });
 

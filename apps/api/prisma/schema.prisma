@@ -199,10 +199,17 @@ model ApplicationSubject {
   declinedBy          String?   // email/id of the staff who declined it
   upcomingExamIntake  String?   // Upcoming exam intake e.g. "2024-06" (DD MM YYYY on form)
   upcomingExamDate    DateTime? // Auto-filled from ExaminationSchedule
-  // Previous exam details (Section 6 of form)
+  // Previous exam details (Section 6 of form) — 1st attempt.
   previousExamDate    DateTime?
   previousExamIntake  String?
   gradeEarned         String?   // For repeat: grade earned in previous attempt
+  // Previous exam details — 2nd attempt (optional; a subject may have been sat twice).
+  secondAttemptDate   DateTime?
+  secondAttemptIntake String?
+  secondAttemptGrade  String?
+  // Medical-category only: the serial number on the medical board's approval,
+  // recorded alongside the uploaded certificate.
+  medicalApprovalSerial String?
   // Admission-card print tracking (per subject).
   admissionPrinted    Boolean   @default(false)
   admissionPrintedAt  DateTime?

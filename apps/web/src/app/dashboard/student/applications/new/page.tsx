@@ -27,9 +27,14 @@ interface SelectedSubject {
   caMarks: string;
   upcomingExamIntake: string;
   upcomingExamDate: string;
-  previousExamDate: string;
+  // Previous Examination Details — 1st attempt (required: intake + grade).
   previousExamIntake: string;
   gradeEarned: string;
+  // Previous Examination Details — 2nd attempt (optional).
+  secondAttemptIntake: string;
+  secondAttemptGrade: string;
+  // Medical-category only: the serial number on the medical board's approval.
+  medicalApprovalSerial: string;
   // Medical-category subjects require at least one certificate, attached here
   // and uploaded after the draft is created. A subject may have one or more.
   medicalCertificates: File[];
@@ -85,8 +90,28 @@ const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
   { value: '1ST_ATTEMPT', label: '1st Attempt' },
 ];
 
+// Grade earned on a previous attempt — a repeat is only possible below a pass,
+// so the options are capped to the fail-range grades.
+const GRADE_OPTIONS = ['C-', 'D+', 'D', 'E'];
+
 // The category dropdown starts with no selection — the student must choose.
 const DEFAULT_CATEGORY = '' as const;
+
+// Compact labelled field — consistent small sizing throughout the subject panel.
+// Defined at module scope (not inside a render function) so its identity is
+// stable across re-renders; otherwise React remounts the inputs on every
+// keystroke and the field loses focus after each character.
+function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+        {label} {required && <span className="text-red-500">*</span>}
+        {hint && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">{hint}</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
 
 // Per-subject fee; 0 while no category is chosen yet.
 const feeForCategory = (category: Category | ''): number => (category ? FEES[category] : 0);
@@ -198,9 +223,11 @@ export default function NewApplicationPage() {
     caMarks: '',
     upcomingExamIntake: '',
     upcomingExamDate: '',
-    previousExamDate: '',
     previousExamIntake: '',
     gradeEarned: '',
+    secondAttemptIntake: '',
+    secondAttemptGrade: '',
+    medicalApprovalSerial: '',
     medicalCertificates: [],
   });
 
@@ -273,18 +300,25 @@ export default function NewApplicationPage() {
     );
   };
 
+  // CA Marks must be a whole number strictly between 0 and 100 (0 is not a valid mark).
+  const caMarksInvalid = (v: string) => {
+    if (v === '' || v === undefined) return true;
+    const n = Number(v);
+    return !Number.isFinite(n) || n <= 0 || n > 100;
+  };
+
   // Per-subject missing/invalid fields, keyed by field name — drives the inline
   // red highlighting once the student has attempted to continue.
   const subjectFieldErrors = (s: SelectedSubject): Set<keyof SelectedSubject> => {
     const e = new Set<keyof SelectedSubject>();
     if (!s.category) e.add('category');
-    if (s.caMarks === '' || s.caMarks === undefined) e.add('caMarks');
+    if (caMarksInvalid(s.caMarks)) e.add('caMarks');
     if (!s.upcomingExamIntake.trim()) e.add('upcomingExamIntake');
     if (!s.upcomingExamDate || s.upcomingExamDate < todayISO) e.add('upcomingExamDate');
-    if (!s.previousExamDate || s.previousExamDate > todayISO) e.add('previousExamDate');
     if (!s.previousExamIntake.trim()) e.add('previousExamIntake');
     if (s.category === 'REPEAT' && !s.gradeEarned.trim()) e.add('gradeEarned');
     if (s.category === 'MEDICAL' && s.medicalCertificates.length === 0) e.add('medicalCertificates');
+    if (s.category === 'MEDICAL' && !s.medicalApprovalSerial.trim()) e.add('medicalApprovalSerial');
     return e;
   };
 
@@ -294,15 +328,14 @@ export default function NewApplicationPage() {
     for (const s of selected) {
       const code = subjects.find((subj) => subj.id === s.subjectId)?.code ?? 'subject';
       if (!s.category) { setError(`Select a category (${code})`); return false; }
-      if (s.caMarks === '' || s.caMarks === undefined) { setError(`CA Marks are required (${code})`); return false; }
+      if (caMarksInvalid(s.caMarks)) { setError(`CA Marks must be between 1 and 100 (${code})`); return false; }
       if (!s.upcomingExamIntake.trim()) { setError(`Upcoming Exam Intake is required (${code})`); return false; }
       if (!s.upcomingExamDate) { setError(`Upcoming Exam Date is required (${code})`); return false; }
       if (s.upcomingExamDate < todayISO) { setError(`Upcoming Exam Date cannot be in the past (${code})`); return false; }
-      if (!s.previousExamDate) { setError(`Date of Previous Exam is required (${code})`); return false; }
-      if (s.previousExamDate > todayISO) { setError(`Date of Previous Exam cannot be in the future (${code})`); return false; }
       if (!s.previousExamIntake.trim()) { setError(`Previous exam Intake Details are required (${code})`); return false; }
       if (s.category === 'REPEAT' && !s.gradeEarned.trim()) { setError(`Grade Earned is required (${code})`); return false; }
       if (s.category === 'MEDICAL' && s.medicalCertificates.length === 0) { setError(`At least one medical certificate is required (${code})`); return false; }
+      if (s.category === 'MEDICAL' && !s.medicalApprovalSerial.trim()) { setError(`Medical Approval Serial Number is required (${code})`); return false; }
     }
     setError('');
     return true;
@@ -320,9 +353,11 @@ export default function NewApplicationPage() {
           caMarks: Number(s.caMarks),
           upcomingExamIntake: s.upcomingExamIntake || undefined,
           upcomingExamDate: s.upcomingExamDate || undefined,
-          previousExamDate: s.previousExamDate || undefined,
           previousExamIntake: s.previousExamIntake || undefined,
           gradeEarned: s.gradeEarned || undefined,
+          secondAttemptIntake: s.secondAttemptIntake || undefined,
+          secondAttemptGrade: s.secondAttemptGrade || undefined,
+          medicalApprovalSerial: s.medicalApprovalSerial || undefined,
         })),
       });
 
@@ -379,85 +414,152 @@ export default function NewApplicationPage() {
       errs.has(field)
         ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
         : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100';
+    const inputCls = (field: keyof SelectedSubject, autofilled?: boolean) =>
+      `w-full rounded-md border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+        errs.has(field)
+          ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+          : autofilled
+            ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
+            : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
+      }`;
+    // A short grade dropdown (C-, D+, D, E) doesn't need full field width/padding.
+    const gradeCls = (field: keyof SelectedSubject) =>
+      `w-20 rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-2 ${
+        errs.has(field)
+          ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+          : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
+      }`;
     return (
-    <div className="grid grid-cols-1 gap-x-4 gap-y-3 px-4 pb-4 pt-3.5 sm:grid-cols-2 lg:grid-cols-4">
-      <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">Category *</label>
-        <select
-          value={sel.category}
-          onChange={(e) => updateField(subject.id, 'category', e.target.value)}
-          className={`w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('category')}`}
-        >
-          <option value="" disabled>Select category…</option>
-          {CATEGORY_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="mb-1 block text-xs font-medium text-slate-600">
-          CA Marks <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="number" min={0} max={100} placeholder="0–100"
-          value={sel.caMarks}
-          onChange={(e) => updateField(subject.id, 'caMarks', e.target.value)}
-          className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('caMarks')}`}
-        />
-      </div>
-      <div>
-        <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
-          Upcoming Exam Intake <span className="text-red-500">*</span>
-          {sel.upcomingExamIntake && (
-            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">Auto-filled</span>
-          )}
-        </label>
-        <input
-          type="text" placeholder="From exam schedule"
-          value={sel.upcomingExamIntake}
-          onChange={(e) => updateField(subject.id, 'upcomingExamIntake', e.target.value)}
-          className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
-            errs.has('upcomingExamIntake')
-              ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-              : sel.upcomingExamIntake
-                ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
-                : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
-          }`}
-        />
-      </div>
-      <div>
-        <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
-          Upcoming Exam Date <span className="text-red-500">*</span>
-          {sel.upcomingExamDate && (
-            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600">Auto-filled</span>
-          )}
-        </label>
-        <input
-          type="date"
-          min={todayISO}
-          value={sel.upcomingExamDate}
-          onChange={(e) => updateField(subject.id, 'upcomingExamDate', e.target.value)}
-          className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
-            errs.has('upcomingExamDate')
-              ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-              : sel.upcomingExamDate
-                ? 'border-blue-300 bg-blue-50 focus:border-blue-400 focus:ring-blue-100'
-                : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
-          }`}
-        />
+    <div className="space-y-4 px-4 pb-4 pt-3.5">
+      {/* Core fields */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-4">
+        <Field label="Category" required>
+          <select
+            value={sel.category}
+            onChange={(e) => updateField(subject.id, 'category', e.target.value)}
+            className={`w-full rounded-md border bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('category')}`}
+          >
+            <option value="" disabled>Select…</option>
+            {CATEGORY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="CA Marks" required>
+          <input
+            type="number" min={1} max={100} step={1} placeholder="1–100"
+            value={sel.caMarks}
+            onChange={(e) => {
+              const raw = e.target.value;
+              // Allow clearing the field, but never let a typed value exceed 100
+              // or go negative — clamp instead of accepting then erroring later.
+              if (raw === '') { updateField(subject.id, 'caMarks', ''); return; }
+              const n = Number(raw);
+              if (!Number.isFinite(n)) return;
+              const clamped = Math.min(100, Math.max(0, n));
+              updateField(subject.id, 'caMarks', String(clamped));
+            }}
+            className={inputCls('caMarks')}
+          />
+        </Field>
+        <Field label="Upcoming Intake" required hint={sel.upcomingExamIntake ? 'Auto' : undefined}>
+          <input
+            type="text" placeholder="From schedule"
+            value={sel.upcomingExamIntake}
+            onChange={(e) => updateField(subject.id, 'upcomingExamIntake', e.target.value)}
+            className={inputCls('upcomingExamIntake', !!sel.upcomingExamIntake)}
+          />
+        </Field>
+        <Field label="Upcoming Date" required hint={sel.upcomingExamDate ? 'Auto' : undefined}>
+          <input
+            type="date"
+            min={todayISO}
+            value={sel.upcomingExamDate}
+            onChange={(e) => updateField(subject.id, 'upcomingExamDate', e.target.value)}
+            className={inputCls('upcomingExamDate', !!sel.upcomingExamDate)}
+          />
+        </Field>
       </div>
 
-      {/* Medical certificate — occupies the space beside the exam date for
-          Medical-category subjects. */}
+      {/* Previous Examination Details — 1st (required) + 2nd (optional) attempt, one row */}
+      <div className="border-t border-slate-100 pt-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Previous Examination Details</p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-4">
+          <Field label="1st Attempt Intake" required>
+            <input
+              type="text" placeholder="e.g : 17A WD"
+              list="intake-list"
+              value={sel.previousExamIntake}
+              onChange={(e) => updateField(subject.id, 'previousExamIntake', e.target.value)}
+              className={inputCls('previousExamIntake')}
+            />
+          </Field>
+          {sel.category === 'REPEAT' && (
+            <Field label="1st Attempt Grade" required>
+              <select
+                value={sel.gradeEarned}
+                onChange={(e) => updateField(subject.id, 'gradeEarned', e.target.value)}
+                className={gradeCls('gradeEarned')}
+              >
+                <option value="" disabled>—</option>
+                {GRADE_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </Field>
+          )}
+          <Field label="2nd Attempt Intake" hint="optional">
+            <input
+              type="text" placeholder="e.g : 18A WD"
+              list="intake-list"
+              value={sel.secondAttemptIntake}
+              onChange={(e) => updateField(subject.id, 'secondAttemptIntake', e.target.value)}
+              className={inputCls('secondAttemptIntake')}
+            />
+          </Field>
+          {sel.category === 'REPEAT' && (
+            <Field label="2nd Attempt Grade" hint="optional">
+              <select
+                value={sel.secondAttemptGrade}
+                onChange={(e) => updateField(subject.id, 'secondAttemptGrade', e.target.value)}
+                className={gradeCls('secondAttemptGrade')}
+              >
+                <option value="">—</option>
+                {GRADE_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </Field>
+          )}
+        </div>
+      </div>
+
+      {/* Medical approval serial + certificate — side by side */}
       {sel.category === 'MEDICAL' && (
-        <div className="sm:col-span-2 lg:col-span-2">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
+        <Field label="Medical Approval Serial Number" required>
+          <input
+            type="text" placeholder="e.g 123"
+            value={sel.medicalApprovalSerial}
+            onChange={(e) => updateField(subject.id, 'medicalApprovalSerial', e.target.value)}
+            className={inputCls('medicalApprovalSerial')}
+          />
+          <p className="mt-1 text-[11px] text-slate-400">
+            Check Approve list on SAB LMS:{' '}
+            <a
+              href="https://sablms.casrilanka.com/course/index.php?categoryid=1075"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-blue-600 underline hover:text-blue-700"
+            >
+              sablms.casrilanka.com
+            </a>
+          </p>
+        </Field>
+        <div>
           <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
             Medical Certificate <span className="text-red-500">*</span>
             <span className="font-normal text-slate-400">(PDF, JPG or PNG · max 10MB)</span>
           </label>
           <div className="space-y-2">
             {sel.medicalCertificates.map((file, idx) => (
-              <div key={idx} className="flex items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2">
+              <div key={idx} className="flex items-center justify-between gap-3 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2">
                 <span className="flex items-center gap-2 truncate text-sm font-medium text-emerald-800">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
                     <Check className="h-3.5 w-3.5" />
@@ -473,7 +575,7 @@ export default function NewApplicationPage() {
                 </button>
               </div>
             ))}
-            <label className={`group flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-2 transition-colors ${
+            <label className={`group flex cursor-pointer items-center gap-3 rounded-md border border-dashed px-3 py-2 transition-colors ${
               errs.has('medicalCertificates')
                 ? 'border-red-400 bg-red-50/40 hover:bg-red-50'
                 : 'border-blue-300 bg-blue-50/40 hover:border-blue-400 hover:bg-blue-50'
@@ -499,47 +601,8 @@ export default function NewApplicationPage() {
             </label>
           </div>
         </div>
-      )}
-
-      <div className="sm:col-span-2 lg:col-span-4">
-        <p className="mb-2 border-t border-slate-200 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Previous Examination Details
-        </p>
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Date of Previous Exam <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              max={todayISO}
-              value={sel.previousExamDate}
-              onChange={(e) => updateField(subject.id, 'previousExamDate', e.target.value)}
-              className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('previousExamDate')}`}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details <span className="text-red-500">*</span></label>
-            <input
-              type="text" placeholder="e.g : 17A WD"
-              list="intake-list"
-              value={sel.previousExamIntake}
-              onChange={(e) => updateField(subject.id, 'previousExamIntake', e.target.value)}
-              className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('previousExamIntake')}`}
-            />
-          </div>
-          {sel.category === 'REPEAT' && (
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned <span className="text-red-500">*</span></label>
-              <input
-                type="text" placeholder="e.g. C, D, F"
-                value={sel.gradeEarned}
-                onChange={(e) => updateField(subject.id, 'gradeEarned', e.target.value)}
-                className={`w-full rounded-lg border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${bc('gradeEarned')}`}
-              />
-            </div>
-          )}
         </div>
-      </div>
-
+      )}
     </div>
     );
   };
@@ -938,8 +1001,11 @@ export default function NewApplicationPage() {
                       <span>CA: {s.caMarks}</span>
                       {s.upcomingExamIntake && <span>Intake: {s.upcomingExamIntake}</span>}
                       {s.upcomingExamDate && <span>Exam date: {new Date(s.upcomingExamDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })}</span>}
-                      {s.previousExamDate && <span>Prev: {s.previousExamDate}</span>}
-                      {s.gradeEarned && <span>Grade: {s.gradeEarned}</span>}
+                      {s.previousExamIntake && <span>1st attempt intake: {s.previousExamIntake}</span>}
+                      {s.gradeEarned && <span>1st attempt grade: {s.gradeEarned}</span>}
+                      {s.secondAttemptIntake && <span>2nd attempt intake: {s.secondAttemptIntake}</span>}
+                      {s.secondAttemptGrade && <span>2nd attempt grade: {s.secondAttemptGrade}</span>}
+                      {s.medicalApprovalSerial && <span>Approval Serial: {s.medicalApprovalSerial}</span>}
                       {s.medicalCertificates.length > 0 && (
                         <span>Certificate{s.medicalCertificates.length > 1 ? `s: ${s.medicalCertificates.length}` : `: ${s.medicalCertificates[0].name}`}</span>
                       )}

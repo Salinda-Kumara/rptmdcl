@@ -294,8 +294,12 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
     if (action === 'REJECT' && !remark.trim()) { setError('A remark is required.'); return; }
     setActing(action === 'APPROVE' ? 'FORWARD' : 'REJECT');
     try {
-      const u = await staffApi.financeReview(id, action, remark.trim() || undefined);
-      setApp(u); setShowReject(false); setRemark('');
+      await staffApi.financeReview(id, action, remark.trim() || undefined);
+      setShowReject(false); setRemark('');
+      // Payment decided — return to the Applications list rather than lingering
+      // on the detail page.
+      onBack();
+      return;
     } catch (e: any) {
       setError(e.response?.data?.message?.toString() || 'Action failed');
     } finally { setActing(null); }
@@ -484,7 +488,10 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
             extra={canReview && apDone < APPLICANT_FIELDS.length ? (
               <div className="bg-slate-50 px-6 py-3">
                 <button
-                  onClick={() => { const n = new Set(verified); APPLICANT_FIELDS.forEach((f) => n.add(f.key)); setVerified(n); }}
+                  onClick={() => {
+                    const n = new Set(verified); APPLICANT_FIELDS.forEach((f) => n.add(f.key)); setVerified(n);
+                    setOpenSec((s) => { const o = new Set(s); o.delete('ap'); return o; });
+                  }}
                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                 >
                   ✓ Mark all as verified
@@ -507,7 +514,10 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
             extra={canReview && suDone < subjKeys.length ? (
               <div className="bg-slate-50 px-6 py-3">
                 <button
-                  onClick={() => { const n = new Set(verified); subjKeys.forEach((k) => n.add(k)); setVerified(n); }}
+                  onClick={() => {
+                    const n = new Set(verified); subjKeys.forEach((k) => n.add(k)); setVerified(n);
+                    setOpenSec((s) => { const o = new Set(s); o.delete('su'); return o; });
+                  }}
                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                 >
                   ✓ Mark all as verified
@@ -549,14 +559,17 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                       </span>
                       {s.caMarks != null && <span>CA Marks: <b>{s.caMarks}</b></span>}
                       {s.gradeEarned && <span>Grade: <b>{s.gradeEarned}</b></span>}
-                      {s.previousExamDate && (
-                        <span>
-                          Prev Exam:{' '}
-                          <b>{new Date(s.previousExamDate).toLocaleDateString('en-LK', { year: 'numeric', month: 'short', day: 'numeric' })}</b>
-                        </span>
-                      )}
                       {s.previousExamIntake && (
-                        <span>Prev Intake: <b>{s.previousExamIntake}</b></span>
+                        <span>1st Attempt Intake: <b>{s.previousExamIntake}</b></span>
+                      )}
+                      {s.secondAttemptIntake && (
+                        <span>2nd Attempt Intake: <b>{s.secondAttemptIntake}</b></span>
+                      )}
+                      {s.secondAttemptGrade && (
+                        <span>2nd Attempt Grade: <b>{s.secondAttemptGrade}</b></span>
+                      )}
+                      {s.medicalApprovalSerial && (
+                        <span>Medical Approval Serial: <b>{s.medicalApprovalSerial}</b></span>
                       )}
                       {s.upcomingExamIntake && (
                         <span>Upcoming Intake: <b>{s.upcomingExamIntake}</b></span>

@@ -96,7 +96,11 @@ const COLUMNS: Col[] = [
   { header: 'Subject Fee (LKR)', num: true, get: ({ s }) => (s ? feeForCategory(s.category) : 0) },
   { header: 'Upcoming Exam Date', get: ({ s }) => fmt(s?.upcomingExamDate) },
   { header: 'Upcoming Intake',   get: ({ s }) => s?.upcomingExamIntake ?? '' },
-  { header: 'Previous Exam Date', get: ({ s }) => fmt(s?.previousExamDate) },
+  { header: '1st Attempt Intake', get: ({ s }) => s?.previousExamIntake ?? '' },
+  { header: '1st Attempt Grade', get: ({ s }) => s?.gradeEarned ?? '' },
+  { header: '2nd Attempt Intake', get: ({ s }) => s?.secondAttemptIntake ?? '' },
+  { header: '2nd Attempt Grade', get: ({ s }) => s?.secondAttemptGrade ?? '' },
+  { header: 'Medical Approval Serial', get: ({ s }) => s?.medicalApprovalSerial ?? '' },
   // ── Application status / payment (merged) ──
   { header: 'Total Fee (LKR)',   app: true, num: true, get: ({ a }) => a.totalFee ?? 0 },
   { header: 'Payment Ref.',      app: true, get: ({ a }) => a.paymentReferenceId ?? '' },

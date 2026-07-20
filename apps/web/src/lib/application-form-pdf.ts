@@ -210,22 +210,40 @@ export async function buildApplicationFormPdf(app: StaffApplication): Promise<Ui
     : ['PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'APPROVED', 'PAYMENT_REJECTED'].includes(app.status) ? 'Confirmed'
       : '';
 
+  // A subject contributes one row per attempt sat: the 1st attempt always, and
+  // the 2nd attempt only when it was recorded.
+  const attemptRows = <T,>(subs: any[], row: (s: any, attempt: '1st' | '2nd', intake: string, grade: string) => T): T[] =>
+    subs.flatMap((s) => {
+      const rows = [row(s, '1st', s.previousExamIntake ?? '', s.gradeEarned ?? '')];
+      if (s.secondAttemptIntake || s.secondAttemptGrade) {
+        rows.push(row(s, '2nd', s.secondAttemptIntake ?? '', s.secondAttemptGrade ?? ''));
+      }
+      return rows;
+    });
+
   if (medicalSubs.length) {
     setF('bold', 8.5); text('Medical Exam ', M, y); y += 6;
+    // Only actual Medical-category subjects carry an approval serial (a plain
+    // 1st-Attempt re-sit has none).
+    const rows = attemptRows(medicalSubs, (s, attempt, intake) =>
+      [s.subject?.code ?? '', s.subject?.name ?? '', attempt,
+        (s.category ?? '').toUpperCase() === 'MEDICAL' ? (s.medicalApprovalSerial ?? '') : '', intake]);
     y = prevExamTable(doc, M, right, y,
-      ['Course code', 'Course title', 'Date of the exam', 'Intake details'],
-      [58, tableW - 58 - 100 - 90, 100, 90],
-      medicalSubs.map((s) => [s.subject?.code ?? '', s.subject?.name ?? '', fmtDate(s.previousExamDate), s.previousExamIntake ?? '']),
-      Math.max(1, medicalSubs.length));
+      ['Course code', 'Course title', 'Attempt', 'Medical Approval Serial', 'Intake details'],
+      [52, tableW - 52 - 40 - 92 - 116, 40, 92, 116],
+      rows,
+      Math.max(1, rows.length));
     y += 12;
   }
   if (repeatSubs.length) {
     setF('bold', 8.5); text('Repeat Exam', M, y); y += 6;
+    const rows = attemptRows(repeatSubs, (s, attempt, intake, grade) =>
+      [s.subject?.code ?? '', s.subject?.name ?? '', attempt, intake, grade, examConfirmation]);
     y = prevExamTable(doc, M, right, y,
-      ['Course code', 'Course title', 'Date of the exam', 'Intake details', 'Grade Earned', 'Confirmation from Exam Div.'],
-      [52, tableW - 52 - 68 - 58 - 52 - 82, 68, 58, 52, 82],
-      repeatSubs.map((s) => [s.subject?.code ?? '', s.subject?.name ?? '', fmtDate(s.previousExamDate), s.previousExamIntake ?? '', s.gradeEarned ?? '', examConfirmation]),
-      Math.max(1, repeatSubs.length));
+      ['Course code', 'Course title', 'Attempt', 'Intake details', 'Grade Earned', 'Confirmation from Exam Div.'],
+      [52, tableW - 52 - 42 - 108 - 52 - 82, 42, 108, 52, 82],
+      rows,
+      Math.max(1, rows.length));
   }
   y += 20;
 

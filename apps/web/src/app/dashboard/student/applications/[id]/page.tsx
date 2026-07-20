@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
 import { DocumentsCard } from '@/components/student/DocumentsCard';
+import apiClient from '@/lib/api-client';
 import { printApplicationPacket, openBlankTab } from '@/lib/application-form-pdf';
 import {
   applicationsApi,
@@ -32,6 +33,10 @@ import {
 } from '@/lib/applications-api';
 
 const WORKFLOW = ['DRAFT', 'SUBMITTED', 'PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'APPROVED'];
+
+// Grade earned on a previous attempt — a repeat is only possible below a pass,
+// so the options are capped to the fail-range grades.
+const GRADE_OPTIONS = ['C-', 'D+', 'D', 'E'];
 
 // Mandatory attachments per application type (mirrors the API rule).
 const REQUIRED_DOCS: Record<'MEDICAL' | 'REPEAT', DocumentType[]> = {
@@ -54,7 +59,9 @@ export default function ApplicationDetailPage() {
   const [resubmitting, setResubmitting] = useState(false);
   // Editable copies used only while a RETURNED application is being corrected.
   const [editContact, setEditContact] = useState<{ permanentAddress: string; postalAddress: string; telephone: string; mobile: string; email: string }>({ permanentAddress: '', postalAddress: '', telephone: '', mobile: '', email: '' });
-  const [editSubjects, setEditSubjects] = useState<Record<string, { caMarks: string; upcomingExamIntake: string; upcomingExamDate: string; previousExamDate: string; previousExamIntake: string; gradeEarned: string }>>({});
+  const [editSubjects, setEditSubjects] = useState<Record<string, { caMarks: string; upcomingExamIntake: string; upcomingExamDate: string; previousExamIntake: string; gradeEarned: string; secondAttemptIntake: string; secondAttemptGrade: string; medicalApprovalSerial: string }>>({});
+  // Intake suggestions for the "Intake Details" fields (same source as the new-application form).
+  const [batchList, setBatchList] = useState<string[]>([]);
 
   const isReturned = app?.status === 'RETURNED';
 
@@ -74,9 +81,11 @@ export default function ApplicationDetailPage() {
       caMarks: s.caMarks != null ? String(s.caMarks) : '',
       upcomingExamIntake: s.upcomingExamIntake ?? '',
       upcomingExamDate: iso(s.upcomingExamDate),
-      previousExamDate: iso(s.previousExamDate),
       previousExamIntake: s.previousExamIntake ?? '',
       gradeEarned: s.gradeEarned ?? '',
+      secondAttemptIntake: s.secondAttemptIntake ?? '',
+      secondAttemptGrade: s.secondAttemptGrade ?? '',
+      medicalApprovalSerial: s.medicalApprovalSerial ?? '',
     }])));
   };
 
@@ -86,6 +95,10 @@ export default function ApplicationDetailPage() {
       .catch(() => setError('Application not found'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    apiClient.get<string[]>('/auth/batches').then((r) => setBatchList(r.data)).catch(() => {});
+  }, []);
 
   const setSub = (sid: string, field: string, value: string) =>
     setEditSubjects((prev) => ({ ...prev, [sid]: { ...prev[sid], [field]: value } }));
@@ -100,9 +113,11 @@ export default function ApplicationDetailPage() {
           caMarks: v.caMarks === '' ? undefined : Number(v.caMarks),
           upcomingExamIntake: v.upcomingExamIntake || undefined,
           upcomingExamDate: v.upcomingExamDate || undefined,
-          previousExamDate: v.previousExamDate || undefined,
           previousExamIntake: v.previousExamIntake || undefined,
           gradeEarned: v.gradeEarned || undefined,
+          secondAttemptIntake: v.secondAttemptIntake || undefined,
+          secondAttemptGrade: v.secondAttemptGrade || undefined,
+          medicalApprovalSerial: v.medicalApprovalSerial || undefined,
         })),
       });
       setApp(updated); seedEdits(updated);
@@ -122,10 +137,9 @@ export default function ApplicationDetailPage() {
     if (!paymentRef.trim()) { setError('Enter a payment reference number'); return; }
     setSubmitting(true); setError('');
     try {
-      const updated = await applicationsApi.submit(id, paymentRef.trim());
-      setApp(updated);
-      setSuccess('Application submitted successfully!');
-      setPaymentRef('');
+      await applicationsApi.submit(id, paymentRef.trim());
+      router.push('/dashboard/student/applications');
+      return;
     } catch (e: any) {
       setError(e.response?.data?.message || 'Submission failed');
     } finally {
@@ -286,6 +300,9 @@ export default function ApplicationDetailPage() {
               {/* Correction form — RETURNED only */}
               {isReturned && (
                 <div className="rounded-2xl border border-orange-200 bg-white shadow-sm">
+                  <datalist id="intake-list">
+                    {batchList.map((b) => <option key={b} value={b} />)}
+                  </datalist>
                   <div className="border-b border-orange-100 px-6 py-4">
                     <h3 className="text-sm font-semibold text-slate-900">Correct &amp; Resubmit</h3>
                     <p className="mt-0.5 text-xs text-slate-500">
@@ -317,7 +334,7 @@ export default function ApplicationDetailPage() {
                     {/* Per-subject fields */}
                     <div className="space-y-3">
                       {app.applicationSubjects.map((s) => {
-                        const v = editSubjects[s.id] ?? { caMarks: '', upcomingExamIntake: '', upcomingExamDate: '', previousExamDate: '', previousExamIntake: '', gradeEarned: '' };
+                        const v = editSubjects[s.id] ?? { caMarks: '', upcomingExamIntake: '', upcomingExamDate: '', previousExamIntake: '', gradeEarned: '', secondAttemptIntake: '', secondAttemptGrade: '', medicalApprovalSerial: '' };
                         return (
                           <div key={s.id} className="rounded-xl border border-slate-200 p-4">
                             <p className="mb-3 text-sm font-semibold text-slate-800">
@@ -327,8 +344,14 @@ export default function ApplicationDetailPage() {
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                               <div>
                                 <label className="mb-1 block text-xs font-medium text-slate-600">CA Marks</label>
-                                <input type="number" min={0} max={100} value={v.caMarks}
-                                  onChange={(e) => setSub(s.id, 'caMarks', e.target.value)}
+                                <input type="number" min={1} max={100} step={1} value={v.caMarks}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === '') { setSub(s.id, 'caMarks', ''); return; }
+                                    const n = Number(raw);
+                                    if (!Number.isFinite(n)) return;
+                                    setSub(s.id, 'caMarks', String(Math.min(100, Math.max(0, n))));
+                                  }}
                                   className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
                               </div>
                               <div>
@@ -343,27 +366,74 @@ export default function ApplicationDetailPage() {
                                   onChange={(e) => setSub(s.id, 'upcomingExamDate', e.target.value)}
                                   className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
                               </div>
+                            </div>
+
+                            {/* Previous Examination Details — 1st / 2nd attempt */}
+                            <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">1st Attempt</p>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                               <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Date of Previous Exam</label>
-                                <input type="date" value={v.previousExamDate}
-                                  onChange={(e) => setSub(s.id, 'previousExamDate', e.target.value)}
-                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Previous Intake</label>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details</label>
                                 <input type="text" value={v.previousExamIntake}
+                                  list="intake-list"
                                   onChange={(e) => setSub(s.id, 'previousExamIntake', e.target.value)}
                                   className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
                               </div>
                               {s.category === 'REPEAT' && (
                                 <div>
                                   <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned</label>
-                                  <input type="text" value={v.gradeEarned}
+                                  <select value={v.gradeEarned}
                                     onChange={(e) => setSub(s.id, 'gradeEarned', e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                                    className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                                    <option value="" disabled>—</option>
+                                    {GRADE_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
+                                  </select>
                                 </div>
                               )}
                             </div>
+
+                            <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                              2nd Attempt <span className="font-medium normal-case text-slate-400">(if applicable)</span>
+                            </p>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Intake Details</label>
+                                <input type="text" value={v.secondAttemptIntake}
+                                  list="intake-list"
+                                  onChange={(e) => setSub(s.id, 'secondAttemptIntake', e.target.value)}
+                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                              </div>
+                              {s.category === 'REPEAT' && (
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-slate-600">Grade Earned</label>
+                                  <select value={v.secondAttemptGrade}
+                                    onChange={(e) => setSub(s.id, 'secondAttemptGrade', e.target.value)}
+                                    className="w-20 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                                    <option value="">—</option>
+                                    {GRADE_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+
+                            {s.category === 'MEDICAL' && (
+                              <div className="mt-3 border-t border-slate-100 pt-3">
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Medical Approval Serial Number</label>
+                                <input type="text" placeholder="e.g 123" value={v.medicalApprovalSerial}
+                                  onChange={(e) => setSub(s.id, 'medicalApprovalSerial', e.target.value)}
+                                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+                                <p className="mt-1 text-[11px] text-slate-400">
+                                  Check Approve list on SAB LMS:{' '}
+                                  <a
+                                    href="https://sablms.casrilanka.com/course/index.php?categoryid=1075"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-medium text-blue-600 underline hover:text-blue-700"
+                                  >
+                                    sablms.casrilanka.com
+                                  </a>
+                                </p>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

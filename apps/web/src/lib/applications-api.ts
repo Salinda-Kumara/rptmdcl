@@ -19,6 +19,12 @@ export interface ApplicationSubject {
   previousExamDate?: string | null;
   previousExamIntake?: string | null;
   gradeEarned?: string | null;
+  // Previous Examination Details — 2nd attempt (optional).
+  secondAttemptDate?: string | null;
+  secondAttemptIntake?: string | null;
+  secondAttemptGrade?: string | null;
+  // Medical-category only: the medical board approval's serial number.
+  medicalApprovalSerial?: string | null;
   // Per-subject review outcome — DECLINED subjects were rejected by the Exam
   // Division while the rest of the application was forwarded.
   status?: 'ACTIVE' | 'DECLINED' | string;
@@ -37,6 +43,10 @@ export interface ResubmitData {
     previousExamDate?: string;
     previousExamIntake?: string;
     gradeEarned?: string;
+    secondAttemptDate?: string;
+    secondAttemptIntake?: string;
+    secondAttemptGrade?: string;
+    medicalApprovalSerial?: string;
   }>;
 }
 
@@ -106,6 +116,10 @@ export interface CreateApplicationData {
     previousExamDate?: string;
     previousExamIntake?: string;
     gradeEarned?: string;
+    secondAttemptDate?: string;
+    secondAttemptIntake?: string;
+    secondAttemptGrade?: string;
+    medicalApprovalSerial?: string;
   }>;
 }
 

@@ -46,9 +46,9 @@ export class ApplicationSubjectDto {
   category: SubjectCategory;
 
   @IsNumber()
-  @Min(0)
+  @Min(1)
   @Max(100)
-  caMarks: number; // Mandatory per the physical form
+  caMarks: number; // Mandatory per the physical form; 0 is not a valid mark
 
   @IsOptional()
   @IsString()
@@ -69,6 +69,24 @@ export class ApplicationSubjectDto {
   @IsOptional()
   @IsString()
   gradeEarned?: string; // For repeat applications
+
+  // Previous Examination Details — 2nd attempt (optional).
+  @IsOptional()
+  @IsDateString()
+  secondAttemptDate?: string;
+
+  @IsOptional()
+  @IsString()
+  secondAttemptIntake?: string;
+
+  @IsOptional()
+  @IsString()
+  secondAttemptGrade?: string;
+
+  // Medical-category only: the serial number on the medical board's approval.
+  @IsOptional()
+  @IsString()
+  medicalApprovalSerial?: string;
 }
 
 // Personal details the student may verify/correct on the application form.
@@ -177,9 +195,9 @@ export class ResubmitSubjectDto {
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @Min(1)
   @Max(100)
-  caMarks?: number;
+  caMarks?: number; // 0 is not a valid mark
 
   @IsOptional()
   @IsString()
@@ -200,6 +218,22 @@ export class ResubmitSubjectDto {
   @IsOptional()
   @IsString()
   gradeEarned?: string;
+
+  @IsOptional()
+  @IsDateString()
+  secondAttemptDate?: string;
+
+  @IsOptional()
+  @IsString()
+  secondAttemptIntake?: string;
+
+  @IsOptional()
+  @IsString()
+  secondAttemptGrade?: string;
+
+  @IsOptional()
+  @IsString()
+  medicalApprovalSerial?: string;
 }
 
 export class ResubmitApplicationDto {
