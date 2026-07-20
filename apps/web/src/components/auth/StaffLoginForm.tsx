@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { staffApi } from '@/lib/staff-api';
@@ -69,6 +70,15 @@ export function StaffLoginForm() {
         onChange={(e) => setPassword(e.target.value)}
         required
       />
+
+      <div className="flex justify-end">
+        <Link
+          href="/login/staff/reset"
+          className="text-xs font-medium text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+        >
+          Forgot password?
+        </Link>
+      </div>
 
       {error && <AuthError>{error}</AuthError>}
 

@@ -22,14 +22,33 @@ model User {
   deletedAt DateTime?
 
   // Relations
-  staffUser   StaffUser?
-  student     Student?
-  permissions UserPermission[]
-  auditLogs   AuditLog[]
-  remarks     Remark[]
+  staffUser        StaffUser?
+  student          Student?
+  permissions      UserPermission[]
+  auditLogs        AuditLog[]
+  remarks          Remark[]
+  passwordResetOtps PasswordResetOtp[]
 
   @@index([email])
   @@index([deletedAt])
+}
+
+// OTP-based staff password reset. A code is emailed to the account, verified,
+// then exchanged (once) for a short-lived reset token used to set a new
+// password. Never store the code itself — only its hash.
+model PasswordResetOtp {
+  id        String    @id @default(uuid())
+  userId    String
+  codeHash  String    // argon2 hash of the 6-digit code
+  expiresAt DateTime  // issued + 10 minutes
+  attempts  Int       @default(0) // wrong guesses; capped at 5
+  verified  Boolean   @default(false) // true once the correct code was entered
+  used      Boolean   @default(false) // true once exchanged for a password change
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // Per-user, per-feature access level. Absence of a row = no access (None).

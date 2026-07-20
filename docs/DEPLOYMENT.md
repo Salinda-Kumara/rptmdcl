@@ -36,6 +36,10 @@ nano .env
 - `HOST_ADDR`: Change this to the IP address of your server on the local network (e.g., `192.168.1.50`). This is the IP that users will type into their browsers to access the application.
 - `POSTGRES_PASSWORD`: Set a secure password containing **only alphanumeric characters** (letters and numbers). Avoid special characters like `@`, `/`, or `?` as they can break the database connection string.
 - `JWT_SECRET` & `JWT_REFRESH_SECRET`: Generate and paste strong random strings here (e.g., using `openssl rand -base64 48`).
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`: Needed for the staff
+  "Forgot password" OTP emails. Any SMTP provider works — e.g.
+  [Brevo](https://www.brevo.com)'s free tier (SMTP & API settings → generate an SMTP key). Without these set,
+  staff password reset will fail with a 500 when requesting a code; the rest of the app is unaffected.
 
 ### 3. Build and Start the Application
 
@@ -47,25 +51,36 @@ docker compose -f docker-compose.deploy.yml up -d --build
 
 ### 4. Initialize the Database (First-Time Only)
 
-When starting the application for the very first time, the database will be empty. You need to push the Prisma schema to create the tables, create the separate logs database, and then run the seed script to populate initial data.
+On a **fresh** volume, two things happen automatically the moment the containers
+start — you don't need to trigger them yourself:
+
+- Postgres runs [`docker/initdb/01-create-logs-db.sql`](../docker/initdb/01-create-logs-db.sql),
+  which creates the separate `ermas_logs` database.
+- The `api` container's own startup command
+  ([`docker/Dockerfile.api`](../docker/Dockerfile.api)) runs
+  `prisma db push` and only starts the server once that succeeds.
+
+So all that's left after step 3 is to wait for the API to finish starting, then seed:
 
 ```bash
-# Push the schema to create database tables (main DB)
-docker compose -f docker-compose.deploy.yml exec api npx prisma db push
-
-# Create the SEPARATE activity-logs database (the app auto-creates its table on start).
-# Use the POSTGRES_USER from your .env (default: ermas).
-docker compose -f docker-compose.deploy.yml exec postgres \
-  psql -U ermas -c "CREATE DATABASE ermas_logs;"
-docker compose -f docker-compose.deploy.yml restart api
+# Wait for the schema push + server startup to finish.
+until docker compose -f docker-compose.deploy.yml logs api 2>&1 | grep -q "Server is running"; do sleep 2; done
 
 # Seed programmes, subjects and the exam-staff directory
 docker compose -f docker-compose.deploy.yml exec api node dist/prisma/seed.js
 ```
 
 > **Note:** Students and batches are **not** seeded — import them from Excel via the
-> admin **Students** screen. If you skip the `ermas_logs` step the app still runs;
-> the Activity Logs feature is simply disabled (with a warning in the API logs).
+> admin **Students** screen.
+>
+> If you're restoring onto an **existing** (non-fresh) Postgres volume, the
+> initdb script won't re-run, so `ermas_logs` may not exist yet — in that case
+> the app still runs fine (the Activity Logs feature is simply disabled, with a
+> warning in the API logs) until you create it manually and restart:
+> ```bash
+> docker compose -f docker-compose.deploy.yml exec postgres psql -U ermas -c "CREATE DATABASE ermas_logs;"
+> docker compose -f docker-compose.deploy.yml restart api
+> ```
 
 ### 4b. Deploying Updates (pulling new code)
 
@@ -75,11 +90,10 @@ To roll out a new version after the initial setup:
 cd ermas
 git pull
 
-# Rebuild and restart the containers with the new code
+# Rebuild and restart the containers with the new code — the api container
+# applies any schema changes (new columns/tables) automatically on startup,
+# via the `prisma db push` baked into its Dockerfile CMD.
 docker compose -f docker-compose.deploy.yml up -d --build
-
-# Sync any schema changes (new columns/tables) into the database
-docker compose -f docker-compose.deploy.yml exec api npx prisma db push
 
 # (Optional) re-run the seed to add any new programmes/subjects/exam staff.
 # It is idempotent, BUT it resets the four staff-account passwords to the seed
@@ -87,8 +101,18 @@ docker compose -f docker-compose.deploy.yml exec api npx prisma db push
 docker compose -f docker-compose.deploy.yml exec api node dist/prisma/seed.js
 ```
 
-If `prisma db push` warns about potential data loss on a change you expect and
-have reviewed, re-run it with `--accept-data-loss`.
+> **Don't** run `docker compose exec api npx prisma db push` manually right
+> after `up -d --build` — the container is already running that exact command
+> on its own as part of starting up, and a second push racing the first one
+> can throw a harmless-but-alarming `relation "..." already exists` error. If
+> you want to review a schema diff before deploying, run `prisma db push` from
+> your own machine against a copy of the DB instead, or just trust the
+> automatic one and check `docker compose logs api` afterward.
+>
+> If the automatic push ever needs to accept a lossy change (e.g. narrowing a
+> column), it already runs with `--accept-data-loss` baked in — review such
+> changes carefully before merging them, since the container won't ask for
+> confirmation in production.
 
 ### 5. Access the Application
 
@@ -198,12 +222,17 @@ docker compose -f docker-compose.deploy.yml down
 docker compose -f docker-compose.deploy.yml up -d --build
 ```
 
-**Reset Database (WARNING: Deletes Data):**
+**Reset Database (WARNING: Deletes Data — including uploaded files):**
+
+`down -v` wipes both the Postgres volume and the uploads volume, giving you a
+completely fresh volume — so the same auto-provisioning from
+[step 4](#4-initialize-the-database-first-time-only) applies: don't run
+`prisma db push` or `CREATE DATABASE ermas_logs` manually, just wait for the
+API to finish starting, then seed.
+
 ```bash
 docker compose -f docker-compose.deploy.yml down -v
 docker compose -f docker-compose.deploy.yml up -d --build
-docker compose -f docker-compose.deploy.yml exec api npx prisma db push
-docker compose -f docker-compose.deploy.yml exec postgres psql -U ermas -c "CREATE DATABASE ermas_logs;"
-docker compose -f docker-compose.deploy.yml restart api
+until docker compose -f docker-compose.deploy.yml logs api 2>&1 | grep -q "Server is running"; do sleep 2; done
 docker compose -f docker-compose.deploy.yml exec api node dist/prisma/seed.js
 ```

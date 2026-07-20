@@ -36,3 +36,31 @@ export class RefreshTokenDto {
   @IsString()
   refreshToken: string;
 }
+
+// ── Staff password reset (OTP) ──
+export class ForgotPasswordDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class VerifyResetOtpDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsNotEmpty()
+  @IsString()
+  otp: string;
+}
+
+export class ResetPasswordDto {
+  @IsNotEmpty()
+  @IsString()
+  resetToken: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
+}

@@ -116,6 +116,14 @@ export const staffApi = {
   },
 
   getProfile: () => apiClient.get('/auth/profile').then((r) => r.data),
+
+  // Staff password reset (OTP flow).
+  forgotPassword: (email: string) =>
+    apiClient.post<{ message: string }>('/auth/staff/forgot-password', { email }).then((r) => r.data),
+  verifyResetOtp: (email: string, otp: string) =>
+    apiClient.post<{ resetToken: string }>('/auth/staff/verify-reset-otp', { email, otp }).then((r) => r.data),
+  resetPassword: (resetToken: string, newPassword: string) =>
+    apiClient.post<{ message: string }>('/auth/staff/reset-password', { resetToken, newPassword }).then((r) => r.data),
 };
 
 export function formatLKR(amount: number) {
