@@ -431,6 +431,43 @@ async function imageToPngBytes(bytes: Uint8Array, mime: string): Promise<Uint8Ar
   }
 }
 
+/**
+ * Render every page of a PDF to a PNG using pdf.js — the same rendering engine
+ * browsers use to display PDFs (i.e. what the student already sees when they
+ * open the file directly). pdf-lib's cheaper page-copying (embedPages/drawPage)
+ * can render certain PDFs — notably some Word "Save as PDF" exports — as blank,
+ * even though the file itself is fine. Rasterizing guarantees the merged copy
+ * always matches what's actually in the file.
+ */
+async function renderPdfPagesToPngs(
+  bytes: Uint8Array,
+): Promise<{ png: Uint8Array; widthPt: number; heightPt: number }[]> {
+  const pdfjs: any = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+
+  const doc = await pdfjs.getDocument({ data: bytes }).promise;
+  const RENDER_SCALE = 2; // ~144dpi at the PDF's 72pt/in — sharp enough to print/verify
+  const pages: { png: Uint8Array; widthPt: number; heightPt: number }[] = [];
+
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const nativeViewport = page.getViewport({ scale: 1 }); // page size in PDF points
+    const viewport = page.getViewport({ scale: RENDER_SCALE });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d')!;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const dataUrl = canvas.toDataURL('image/png');
+    const b64 = dataUrl.split(',')[1];
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let j = 0; j < bin.length; j++) out[j] = bin.charCodeAt(j);
+    pages.push({ png: out, widthPt: nativeViewport.width, heightPt: nativeViewport.height });
+  }
+  return pages;
+}
+
 // A4 portrait dimensions (pt).
 const A4_W = 595.28;
 const A4_H = 841.89;
@@ -455,16 +492,6 @@ export async function buildApplicationPacket(app: StaffApplication, generatedBy?
     page.drawPage(ep, { x: 0, y: 0, width: A4_W, height: A4_H });
   };
 
-  // Attachment PDF pages: appended EXACTLY as the student uploaded them — the new
-  // page matches the attachment's own size and the content is drawn at 1:1 scale.
-  // No resizing, cropping, or label drawn over the content. The same footer as
-  // every other page is still stamped on it afterwards (step 3 below) so the
-  // packet stays visually consistent page-to-page.
-  const placeAttachmentPage = (ep: any) => {
-    const page = merged.addPage([ep.width, ep.height]);
-    page.drawPage(ep, { x: 0, y: 0, width: ep.width, height: ep.height });
-  };
-
   // 1) form pages — full size (already A4 portrait)
   const formDoc = await PDFDocument.load(formBytes);
   const formEmbedded = await merged.embedPages(formDoc.getPages());
@@ -484,10 +511,17 @@ export async function buildApplicationPacket(app: StaffApplication, generatedBy?
     const label = DOC_TYPE_LABELS[d.documentType as keyof typeof DOC_TYPE_LABELS] || d.fileName || 'Attachment';
 
     if (isPdf) {
+      // Rasterize each page (pdf.js — the same engine the student's own PDF
+      // viewer uses) rather than copying it through pdf-lib, which can render
+      // some source PDFs blank. The resulting page matches the attachment's
+      // own size 1:1 — no resizing, cropping, or label drawn over the content.
       try {
-        const att = await PDFDocument.load(data.bytes, { ignoreEncryption: true });
-        const embedded = await merged.embedPages(att.getPages());
-        embedded.forEach((ep) => placeAttachmentPage(ep));
+        const rendered = await renderPdfPagesToPngs(data.bytes);
+        for (const r of rendered) {
+          const png = await merged.embedPng(r.png);
+          const page = merged.addPage([r.widthPt, r.heightPt]);
+          page.drawImage(png, { x: 0, y: 0, width: r.widthPt, height: r.heightPt });
+        }
       } catch (e) { console.error(`[packet] broken PDF ${d.fileName}`, e); }
     } else {
       // treat as image → its own fitted portrait page
