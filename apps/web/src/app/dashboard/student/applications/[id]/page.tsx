@@ -56,6 +56,7 @@ export default function ApplicationDetailPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [printing, setPrinting] = useState(false);
+  const [printProgress, setPrintProgress] = useState('');
   const [resubmitting, setResubmitting] = useState(false);
   // Editable copies used only while a RETURNED application is being corrected.
   const [editContact, setEditContact] = useState<{ permanentAddress: string; postalAddress: string; telephone: string; mobile: string; email: string }>({ permanentAddress: '', postalAddress: '', telephone: '', mobile: '', email: '' });
@@ -177,14 +178,20 @@ export default function ApplicationDetailPage() {
               if (printing) return;
               const win = openBlankTab(); // open synchronously to keep the user gesture
               setPrinting(true);
+              setPrintProgress('Starting…');
               const nic = (app.applicantDetails as any)?.nic || (app as any).student?.nic || '';
-              try { await printApplicationPacket(app, win, nic ? `NIC ${nic}` : undefined); } catch (e) { console.error(e); } finally { setPrinting(false); }
+              try {
+                await printApplicationPacket(app, win, nic ? `NIC ${nic}` : undefined, (p) =>
+                  setPrintProgress(`${p.label} (${p.current}/${p.total})`));
+              } catch (e) { console.error(e); }
+              finally { setPrinting(false); setPrintProgress(''); }
             }}
             disabled={printing}
+            title={printing ? printProgress : undefined}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
           >
             {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-            Print Application
+            {printing ? printProgress || 'Generating…' : 'Print Application'}
           </button>
         )}
       </div>

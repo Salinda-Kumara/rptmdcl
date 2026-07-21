@@ -174,6 +174,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
   const [verified, setVerified] = useState<Set<string>>(new Set());
   const [openSec, setOpenSec]   = useState(new Set(['ap', 'su', 'do']));
   const [printing, setPrinting] = useState(false);
+  const [printProgress, setPrintProgress] = useState('');
   const [showRollback, setShowRollback] = useState(false);
   const [rollbackRemark, setRollbackRemark] = useState('');
   const [rollbackPassword, setRollbackPassword] = useState('');
@@ -385,13 +386,19 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                 if (printing) return;
                 const win = openBlankTab(); // open synchronously to keep the user-gesture
                 setPrinting(true);
-                try { await printApplicationPacket(app, win, myName || myEmail || undefined); } catch (e) { console.error(e); } finally { setPrinting(false); }
+                setPrintProgress('Starting…');
+                try {
+                  await printApplicationPacket(app, win, myName || myEmail || undefined, (p) =>
+                    setPrintProgress(`${p.label} (${p.current}/${p.total})`));
+                } catch (e) { console.error(e); }
+                finally { setPrinting(false); setPrintProgress(''); }
               }}
               disabled={printing}
+              title={printing ? printProgress : undefined}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
             >
               {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-              Print Application
+              {printing ? printProgress || 'Generating…' : 'Print Application'}
             </button>
           </div>
         )}
