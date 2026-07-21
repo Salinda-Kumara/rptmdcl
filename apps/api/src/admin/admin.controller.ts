@@ -116,7 +116,12 @@ export class AdminController {
 
   /* ── Subjects ── */
   @Get('subjects')
-  @RequirePermission('subjects', 'VIEW')
+  // Also readable with schedules access — exam-schedule entry needs subject
+  // names/codes for its autocomplete, without granting the Subjects screen itself.
+  @RequirePermission([
+    { resource: 'subjects', level: 'VIEW' },
+    { resource: 'schedules', level: 'VIEW' },
+  ])
   listSubjects(@Query('programmeId') programmeId?: string) {
     return this.adminService.listSubjects(programmeId);
   }
@@ -141,7 +146,12 @@ export class AdminController {
 
   /* ── Batches ── */
   @Get('batches')
-  @RequirePermission('batches', 'VIEW')
+  // Also readable with schedules access — exam-schedule entry needs batch
+  // numbers/intakes for its autocomplete, without granting the Batches screen itself.
+  @RequirePermission([
+    { resource: 'batches', level: 'VIEW' },
+    { resource: 'schedules', level: 'VIEW' },
+  ])
   listBatches() {
     return this.adminService.listBatches();
   }
