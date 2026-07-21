@@ -205,7 +205,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
                         <span className="block text-[11px] text-slate-400">Hotline</span>
                         <span className="block text-sm font-medium text-slate-700">
                           +94 11 210 1044
-                          <span className="ml-1.5 rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">Ext 1043</span>
+                          <span className="ml-1.5 rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">Ext 1042</span>
                         </span>
                       </span>
                     </a>
@@ -249,9 +249,11 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => setSupportOpen((v) => !v)}
             title="Help & Support"
-            className={`group flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-900/30 transition-all hover:shadow-xl hover:shadow-blue-900/40 ${supportOpen ? 'rotate-90 scale-95' : 'hover:scale-105'}`}
+            className={`group flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg shadow-blue-900/30 transition-all hover:shadow-xl hover:shadow-blue-900/40 ${supportOpen ? 'rotate-90 scale-95 bg-gradient-to-br from-blue-600 to-indigo-600' : 'hover:scale-105'}`}
           >
-            {supportOpen ? <X className="h-6 w-6" /> : <LifeBuoy className="h-6 w-6 transition-transform group-hover:rotate-12" />}
+            {supportOpen
+              ? <X className="h-6 w-6" />
+              : <img src="/helpdesk.png" alt="Help & Support" className="h-14 w-14 rounded-full object-cover transition-transform group-hover:rotate-12" />}
           </button>
         </div>
       </div>
