@@ -10,6 +10,7 @@
  */
 import { staffApi, StaffApplication } from './staff-api';
 import { DOC_TYPE_LABELS } from './applications-api';
+import { stampPngBytes, type StampInfo } from './stamp-payment-slip';
 
 type Programme = 'AA' | 'BMBA';
 
@@ -406,7 +407,7 @@ function prevExamTable(doc: any, x: number, endX: number, y: number, headers: st
 /* ───────────────────────── Merge attachments (pdf-lib) ───────────────────────── */
 
 /** Decode any browser-supported image to PNG bytes (handles jpg/png/webp/gif). */
-async function imageToPngBytes(bytes: Uint8Array, mime: string): Promise<Uint8Array> {
+export async function imageToPngBytes(bytes: Uint8Array, mime: string): Promise<Uint8Array> {
   const blob = new Blob([bytes as unknown as BlobPart], { type: mime });
   const url = URL.createObjectURL(blob);
   try {
@@ -439,7 +440,7 @@ async function imageToPngBytes(bytes: Uint8Array, mime: string): Promise<Uint8Ar
  * even though the file itself is fine. Rasterizing guarantees the merged copy
  * always matches what's actually in the file.
  */
-async function renderPdfPagesToPngs(
+export async function renderPdfPagesToPngs(
   bytes: Uint8Array,
 ): Promise<{ png: Uint8Array; widthPt: number; heightPt: number }[]> {
   const pdfjs: any = await import('pdfjs-dist');
@@ -526,6 +527,18 @@ export async function buildApplicationPacket(
   const formEmbedded = await merged.embedPages(formDoc.getPages());
   for (const ep of formEmbedded) placeFormPage(ep);
 
+  // The payment slip gets an APPROVED/REJECTED stamp once Finance has decided
+  // — display-only, computed from the current Payment record each time.
+  const payment = app.payment;
+  const paymentStamp: StampInfo | null =
+    payment && (payment.verificationStatus === 'VERIFIED' || payment.verificationStatus === 'REJECTED')
+      ? {
+          verdict: payment.verificationStatus === 'VERIFIED' ? 'APPROVED' : 'REJECTED',
+          date: payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+          by: payment.verifiedBy || '—',
+        }
+      : null;
+
   // 2) attachments after the form — each fitted onto its own A4 page
   for (const d of docs) {
     const label = DOC_TYPE_LABELS[d.documentType as keyof typeof DOC_TYPE_LABELS] || d.fileName || 'Attachment';
@@ -540,6 +553,7 @@ export async function buildApplicationPacket(
     }
     const name = (d.fileName || '').toLowerCase();
     const isPdf = data.mimeType.includes('pdf') || name.endsWith('.pdf');
+    const stamp = d.documentType === 'PAYMENT_SLIP' ? paymentStamp : null;
 
     if (isPdf) {
       // Rasterize each page (pdf.js — the same engine the student's own PDF
@@ -549,7 +563,8 @@ export async function buildApplicationPacket(
       try {
         const rendered = await renderPdfPagesToPngs(data.bytes);
         for (let i = 0; i < rendered.length; i++) {
-          const png = await merged.embedPng(rendered[i].png);
+          const pngBytes = stamp ? await stampPngBytes(rendered[i].png, stamp) : rendered[i].png;
+          const png = await merged.embedPng(pngBytes);
           placeAttachmentImage(png, rendered.length > 1 ? `${label} (${i + 1}/${rendered.length})` : label);
         }
       } catch (e) { console.error(`[packet] broken PDF ${d.fileName}`, e); }
@@ -557,6 +572,7 @@ export async function buildApplicationPacket(
       let pngBytes: Uint8Array;
       try {
         pngBytes = await imageToPngBytes(data.bytes, data.mimeType || 'image/jpeg');
+        if (stamp) pngBytes = await stampPngBytes(pngBytes, stamp);
       } catch (e) {
         console.error(`[packet] image decode failed ${d.fileName}`, e);
         continue;

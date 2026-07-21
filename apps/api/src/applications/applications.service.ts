@@ -499,7 +499,12 @@ export class ApplicationsService {
   // Stage 2 — Finance verifies the payment. They may approve (payment confirmed)
   // or reject (remark required). Status is kept on the application so the staff
   // list reflects the outcome.
-  async financeReview(userId: string, id: string, dto: PaymentReviewDto) {
+  async financeReview(user: any, id: string, dto: PaymentReviewDto) {
+    const userId = user.id;
+    // Resolved display name stamped on the payment slip (and shown as the
+    // verifier) — matches the admissionPrintedBy convention.
+    const verifierName = user?.staffUser?.name ?? user?.email ?? user?.id;
+
     const application = await this.prisma.application.findFirst({
       where: { id, deletedAt: null },
       include: { payment: true },
@@ -529,7 +534,7 @@ export class ApplicationsService {
         ops.push(
           this.prisma.payment.update({
             where: { applicationId: id },
-            data: { verificationStatus: 'REJECTED', verifiedBy: userId, verifiedAt: new Date() },
+            data: { verificationStatus: 'REJECTED', verifiedBy: verifierName, verifiedAt: new Date() },
           }),
         );
       }
@@ -556,7 +561,7 @@ export class ApplicationsService {
       ops.push(
         this.prisma.payment.update({
           where: { applicationId: id },
-          data: { verificationStatus: 'VERIFIED', verifiedBy: userId, verifiedAt: new Date() },
+          data: { verificationStatus: 'VERIFIED', verifiedBy: verifierName, verifiedAt: new Date() },
         }),
       );
     }

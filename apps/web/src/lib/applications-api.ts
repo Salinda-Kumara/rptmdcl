@@ -56,6 +56,7 @@ export interface Payment {
   referenceNumber: string;
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
   verifiedAt?: string;
+  verifiedBy?: string | null;
 }
 
 export type DocumentType = 'PAYMENT_SLIP' | 'MEDICAL_CERTIFICATE' | 'SUPPORTING_DOCUMENT';

@@ -11,6 +11,7 @@ import { Modal } from '@/components/admin/Modal';
 import { useMyPermissions, can } from '@/lib/permissions';
 import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS, applicationTypeLabel } from '@/lib/applications-api';
 import { printApplicationPacket, openBlankTab } from '@/lib/application-form-pdf';
+import { stampPaymentSlip } from '@/lib/stamp-payment-slip';
 
 const APPLICANT_FIELDS: { key: string; label: string }[] = [
   { key: 'fullName',           label: 'Full Name' },
@@ -341,10 +342,28 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
     } finally { setRollingBack(false); }
   };
 
-  const viewDoc = async (docId: string) => {
-    setBusyDoc(docId);
-    try { window.open(await staffApi.documentUrl(docId), '_blank'); }
-    catch { setError('Could not open document'); }
+  const viewDoc = async (doc: { id: string; documentType?: string; fileName?: string }) => {
+    setBusyDoc(doc.id);
+    try {
+      // Once Finance has decided, show the payment slip with an APPROVED /
+      // REJECTED stamp overlaid — display-only, the stored original is untouched.
+      const payment = app?.payment;
+      const decided = doc.documentType === 'PAYMENT_SLIP' && payment &&
+        (payment.verificationStatus === 'VERIFIED' || payment.verificationStatus === 'REJECTED');
+      if (decided) {
+        const { bytes, mimeType } = await staffApi.documentBytes(doc.id);
+        const blob = await stampPaymentSlip(bytes, mimeType, doc.fileName || '', {
+          verdict: payment!.verificationStatus === 'VERIFIED' ? 'APPROVED' : 'REJECTED',
+          date: payment!.verifiedAt ? new Date(payment!.verifiedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+          by: payment!.verifiedBy || '—',
+        });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return;
+      }
+      window.open(await staffApi.documentUrl(doc.id), '_blank');
+    } catch { setError('Could not open document'); }
     finally { setBusyDoc(null); }
   };
 
@@ -591,7 +610,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                         </span>
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); viewDoc(d.id); }}
+                          onClick={(e) => { e.stopPropagation(); viewDoc(d); }}
                           disabled={busyDoc === d.id}
                           className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50"
                         >
@@ -690,7 +709,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => viewDoc(doc.id)}
+                    onClick={() => viewDoc(doc)}
                     disabled={busyDoc === doc.id}
                     className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50"
                   >

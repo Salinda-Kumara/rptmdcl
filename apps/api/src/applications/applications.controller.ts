@@ -155,7 +155,7 @@ export class ApplicationsController {
   @RequirePermission('payments', 'FULL')
   @ApiOperation({ summary: 'Finance: approve or reject payment (staff)' })
   paymentReview(@Req() req: any, @Param('id') id: string, @Body() dto: PaymentReviewDto) {
-    return this.applicationsService.financeReview(req.user.id, id, dto);
+    return this.applicationsService.financeReview(req.user, id, dto);
   }
 
   // Stage 3 — Exam Registrar final approval.
