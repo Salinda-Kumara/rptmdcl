@@ -492,12 +492,28 @@ export async function buildApplicationPacket(app: StaffApplication, generatedBy?
     page.drawPage(ep, { x: 0, y: 0, width: A4_W, height: A4_H });
   };
 
+  // Attachment pages: every page in the packet is a uniform A4 sheet, so the
+  // image is scaled to fit within it — preserving its aspect ratio (no
+  // distortion/cropping) — and centered, with a label identifying the source
+  // attachment. This only resizes the CANVAS the content sits on, not the
+  // content itself (which is already an exact rasterized copy of the upload).
+  const placeAttachmentImage = (png: any, label: string) => {
+    const page = merged.addPage([A4_W, A4_H]);
+    const M = 36, footerH = 46, labelH = 18;
+    page.drawText(label, { x: M, y: A4_H - M - 4, size: 11, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+    const availW = A4_W - 2 * M;
+    const availH = A4_H - M - labelH - footerH;
+    const scale = Math.min(availW / png.width, availH / png.height);
+    const w = png.width * scale, h = png.height * scale;
+    page.drawImage(png, { x: (A4_W - w) / 2, y: footerH + (availH - h) / 2, width: w, height: h });
+  };
+
   // 1) form pages — full size (already A4 portrait)
   const formDoc = await PDFDocument.load(formBytes);
   const formEmbedded = await merged.embedPages(formDoc.getPages());
   for (const ep of formEmbedded) placeFormPage(ep);
 
-  // 2) attachments after the form — each appended unaltered, at its own size
+  // 2) attachments after the form — each fitted onto its own A4 page
   for (const d of app.documents ?? []) {
     let data: { bytes: Uint8Array; mimeType: string };
     try {
@@ -513,18 +529,16 @@ export async function buildApplicationPacket(app: StaffApplication, generatedBy?
     if (isPdf) {
       // Rasterize each page (pdf.js — the same engine the student's own PDF
       // viewer uses) rather than copying it through pdf-lib, which can render
-      // some source PDFs blank. The resulting page matches the attachment's
-      // own size 1:1 — no resizing, cropping, or label drawn over the content.
+      // some source PDFs blank. The image is an exact copy of what's in the
+      // file; placeAttachmentImage only fits it onto a uniform A4 sheet.
       try {
         const rendered = await renderPdfPagesToPngs(data.bytes);
-        for (const r of rendered) {
-          const png = await merged.embedPng(r.png);
-          const page = merged.addPage([r.widthPt, r.heightPt]);
-          page.drawImage(png, { x: 0, y: 0, width: r.widthPt, height: r.heightPt });
+        for (let i = 0; i < rendered.length; i++) {
+          const png = await merged.embedPng(rendered[i].png);
+          placeAttachmentImage(png, rendered.length > 1 ? `${label} (${i + 1}/${rendered.length})` : label);
         }
       } catch (e) { console.error(`[packet] broken PDF ${d.fileName}`, e); }
     } else {
-      // treat as image → its own fitted portrait page
       let pngBytes: Uint8Array;
       try {
         pngBytes = await imageToPngBytes(data.bytes, data.mimeType || 'image/jpeg');
@@ -533,14 +547,7 @@ export async function buildApplicationPacket(app: StaffApplication, generatedBy?
         continue;
       }
       const png = await merged.embedPng(pngBytes);
-      const page = merged.addPage([A4_W, A4_H]);
-      const M = 36, footerH = 46, labelH = 18;
-      page.drawText(label, { x: M, y: A4_H - M - 4, size: 11, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
-      const availW = A4_W - 2 * M;
-      const availH = A4_H - M - labelH - footerH;
-      const scale = Math.min(availW / png.width, availH / png.height);
-      const w = png.width * scale, h = png.height * scale;
-      page.drawImage(png, { x: (A4_W - w) / 2, y: footerH + (availH - h) / 2, width: w, height: h });
+      placeAttachmentImage(png, label);
     }
   }
 
