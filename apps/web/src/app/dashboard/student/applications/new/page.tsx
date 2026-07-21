@@ -237,17 +237,24 @@ export default function NewApplicationPage() {
     return d ? new Date(d).toISOString().slice(0, 10) : '';
   };
 
+  // Applications close 5 days before the exam — a subject can only be applied
+  // for while its scheduled exam is still at least 5 days away.
+  const APPLICATION_CUTOFF_DAYS = 5;
+
   // Match a subject to a published timetable row by course code (spaces/case are
-  // ignored). Only rows whose exam date is still UPCOMING (today or later) are
-  // used — a passed exam date is not auto-filled. Prefer the student's own intake.
+  // ignored). Only rows whose exam date is still at least APPLICATION_CUTOFF_DAYS
+  // away are used — a passed or too-soon exam date is not auto-filled/selectable.
+  // Prefer the student's own intake.
   const normCode = (c?: string | null) => (c ?? '').toUpperCase().replace(/\s+/g, '');
   const scheduleForSubject = (subject: Subject): ScheduledExamInfo | null => {
     const code = normCode(subject.code);
-    // Today's date in Sri Lanka (Asia/Colombo), so the "passed exam" cutoff
-    // follows local date rather than UTC. en-CA formats as YYYY-MM-DD.
-    const todayISO = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Colombo' });
+    // Today's date in Sri Lanka (Asia/Colombo), so the cutoff follows local date
+    // rather than UTC. en-CA formats as YYYY-MM-DD.
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Colombo' }));
+    now.setDate(now.getDate() + APPLICATION_CUTOFF_DAYS);
+    const cutoffISO = now.toLocaleDateString('en-CA');
     const matches = scheduledExams.filter(
-      (e) => normCode(e.courseCode) === code && scheduleDate(e) && scheduleDate(e) >= todayISO,
+      (e) => normCode(e.courseCode) === code && scheduleDate(e) && scheduleDate(e) >= cutoffISO,
     );
     if (!matches.length) return null;
     const myIntake = (applicant.intake || applicant.batchNumber || '').toLowerCase().trim();
@@ -392,9 +399,9 @@ export default function NewApplicationPage() {
     .map((s) => subjects.find((subj) => subj.id === s.subjectId))
     .filter((subj): subj is Subject => Boolean(subj));
 
-  // Only subjects with an upcoming exam in an apply-enabled schedule can be
-  // applied for. Subjects with no scheduled (future-dated) exam are hidden — if
-  // nothing is scheduled/enabled, the pool is empty.
+  // Only subjects with an upcoming exam — at least APPLICATION_CUTOFF_DAYS away —
+  // in an apply-enabled schedule can be applied for. Subjects with no such exam
+  // (none scheduled, apply not enabled, or the exam is too close/passed) are hidden.
   const schedulableSubjects = subjects.filter((subj) => scheduleForSubject(subj) !== null);
 
   const query = subjectSearch.trim().toLowerCase();
@@ -871,6 +878,11 @@ export default function NewApplicationPage() {
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                     Add Subjects
                   </p>
+                  <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    Applications close {APPLICATION_CUTOFF_DAYS} days before a subject's exam date — subjects due
+                    within that window are no longer listed here.
+                  </p>
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
@@ -894,7 +906,7 @@ export default function NewApplicationPage() {
                     {availableSubjects.length === 0 ? (
                       <p className="py-6 text-center text-sm text-slate-400">
                         {schedulableSubjects.length === 0
-                          ? 'No subjects are currently open for application. Applications open once an exam schedule is published and enabled.'
+                          ? `No subjects are currently open for application. This includes subjects whose exam is published but within ${APPLICATION_CUTOFF_DAYS} days, or with no schedule enabled yet.`
                           : query
                             ? `No subjects match “${subjectSearch}”.`
                             : 'All available subjects have been selected.'}
