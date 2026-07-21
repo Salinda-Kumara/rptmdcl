@@ -34,7 +34,7 @@ function drawStamp(canvas: HTMLCanvasElement, info: StampInfo) {
   const ctx = canvas.getContext('2d')!;
   const { width, height } = canvas;
   const color = info.verdict === 'APPROVED' ? '#059669' : '#dc2626'; // emerald-600 / red-600
-  const scale = Math.min(width, height) / 620; // stamp size relative to the image
+  const scale = Math.min(width, height) / 900; // stamp size relative to the image
 
   const boxW = 620 * scale;
   const boxH = 260 * scale;
