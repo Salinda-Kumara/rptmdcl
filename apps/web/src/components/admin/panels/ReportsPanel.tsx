@@ -6,7 +6,7 @@ import {
   Loader2, Inbox, FileClock, Wallet, CheckCircle2, XCircle, ExternalLink, Printer,
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
-import { formatFee, applicationTypeLabel } from '@/lib/applications-api';
+import { formatFee, applicationTypeLabel, fmtDateTime } from '@/lib/applications-api';
 import { exportApplicationsExcel, exportApplicationsPdf } from '@/lib/export-applications';
 import { printApplicationById, openBlankTab } from '@/lib/application-form-pdf';
 import { useMyPermissions } from '@/lib/permissions';
@@ -335,7 +335,7 @@ export function ReportsPanel() {
                         : stageOf(a.status) === 'financeRejected' ? 'Finance Rejected'
                         : a.status
                       }</td>
-                      <td className="px-4 py-2.5 text-xs text-slate-400 dark:text-gray-600">{a.submittedAt ? new Date(a.submittedAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+                      <td className="px-4 py-2.5 text-xs text-slate-400 dark:text-gray-600">{fmtDateTime(a.submittedAt)}</td>
                       <td className="max-w-[220px] px-4 py-2.5 text-xs text-slate-500 dark:text-gray-400">
                         {a.remarks && a.remarks.length > 0
                           ? <span className="line-clamp-2" title={a.remarks.map((r) => r.content).join(' | ')}>{a.remarks.map((r) => r.content).join(' | ')}</span>

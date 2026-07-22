@@ -9,7 +9,7 @@ import {
 import { staffApi, StaffApplication } from '@/lib/staff-api';
 import { Modal } from '@/components/admin/Modal';
 import { useMyPermissions, can } from '@/lib/permissions';
-import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS, applicationTypeLabel } from '@/lib/applications-api';
+import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS, applicationTypeLabel, fmtDateTime } from '@/lib/applications-api';
 import { printApplicationPacket, openBlankTab } from '@/lib/application-form-pdf';
 import { stampPaymentSlip } from '@/lib/stamp-payment-slip';
 
@@ -354,7 +354,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
         const { bytes, mimeType } = await staffApi.documentBytes(doc.id);
         const blob = await stampPaymentSlip(bytes, mimeType, doc.fileName || '', {
           verdict: payment!.verificationStatus === 'VERIFIED' ? 'APPROVED' : 'REJECTED',
-          date: payment!.verifiedAt ? new Date(payment!.verifiedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+          date: fmtDateTime(payment!.verifiedAt),
           by: payment!.verifiedBy || '—',
         });
         const url = URL.createObjectURL(blob);
@@ -460,7 +460,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                   </div>
                   <p className="mt-0.5 text-sm text-slate-400">
                     {applicationTypeLabel(app)} · {app.student?.registrationNumber}
-                    {app.submittedAt && ` · Submitted ${new Date(app.submittedAt).toLocaleDateString('en-LK', { dateStyle: 'medium' })}`}
+                    {app.submittedAt && ` · Submitted ${fmtDateTime(app.submittedAt)}`}
                   </p>
                 </div>
               </div>
@@ -600,6 +600,9 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                       {s.upcomingExamIntake && (
                         <span>Upcoming Intake: <b>{s.upcomingExamIntake}</b></span>
                       )}
+                      {s.upcomingExamDate && (
+                        <span>Upcoming Exam Date: <b>{new Date(s.upcomingExamDate).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' })}</b></span>
+                      )}
                     </div>
                     {/* Medical certificate(s) uploaded for this subject */}
                     {(docsBySubject.get(s.id) ?? []).map((d: any) => (
@@ -733,7 +736,7 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
                   <div key={r.id} className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                     <p className="text-sm text-slate-800">{r.content}</p>
                     <p className="mt-1.5 text-xs text-slate-400">
-                      {r.user?.staffUser?.name || r.user?.email} · {new Date(r.createdAt).toLocaleString()}
+                      {r.user?.staffUser?.name || r.user?.email} · {fmtDateTime(r.createdAt)}
                     </p>
                   </div>
                 ))}

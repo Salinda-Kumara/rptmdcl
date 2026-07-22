@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FileText, PlusCircle, Inbox, Search, ChevronRight } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
-import { applicationsApi, Application, STATUS_LABELS, STATUS_COLORS, formatFee, applicationTypeLabel } from '@/lib/applications-api';
+import { applicationsApi, Application, STATUS_LABELS, STATUS_COLORS, formatFee, applicationTypeLabel, fmtDateTime } from '@/lib/applications-api';
 
 const FILTERS = [
   { key: 'ALL', label: 'All' },
@@ -160,7 +160,7 @@ export default function ApplicationsListPage() {
                   {app.applicationSubjects.map((s) => `${s.subject.code} — ${s.subject.name}`).join(', ')}
                 </p>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  {new Date(app.createdAt).toLocaleDateString('en-LK', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  {fmtDateTime(app.submittedAt ?? app.createdAt)}
                 </p>
               </div>
 

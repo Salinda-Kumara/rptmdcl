@@ -248,6 +248,16 @@ export function formatFee(amount: number) {
   return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2 })}`;
 }
 
+// Date + time for event timestamps (submitted, verified, created, generated,
+// printed, etc.) — as opposed to plain calendar dates (exam dates, DOBs),
+// which should stay date-only. e.g. "21 Jul 2026, 3:45 PM".
+export function fmtDateTime(d?: string | Date | null): string {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('en-LK', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
 // Human label for a single subject's category.
 export function subjectCategoryLabel(category?: string): string {
   const c = (category ?? '').toUpperCase();

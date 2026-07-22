@@ -30,6 +30,7 @@ import {
   STATUS_COLORS,
   formatFee,
   applicationTypeLabel,
+  fmtDateTime,
 } from '@/lib/applications-api';
 
 const WORKFLOW = ['DRAFT', 'SUBMITTED', 'PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'APPROVED'];
@@ -234,8 +235,8 @@ export default function ApplicationDetailPage() {
                   </div>
                   <p className="mt-0.5 text-sm text-slate-400">
                     {app.serialNumber
-                      ? `Submitted on ${new Date(app.submittedAt ?? app.createdAt).toLocaleDateString('en-LK', { year: 'numeric', month: 'long', day: 'numeric' })}`
-                      : `Created ${new Date(app.createdAt).toLocaleDateString('en-LK', { year: 'numeric', month: 'long', day: 'numeric' })}`}
+                      ? `Submitted on ${fmtDateTime(app.submittedAt ?? app.createdAt)}`
+                      : `Created ${fmtDateTime(app.createdAt)}`}
                   </p>
                 </div>
               </div>
@@ -543,7 +544,7 @@ export default function ApplicationDetailPage() {
                       <div key={r.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                         <p className="text-sm text-slate-800">{r.content}</p>
                         <p className="mt-1 text-xs text-slate-400">
-                          {r.user?.staffUser?.name || r.user?.email} · {new Date(r.createdAt).toLocaleDateString()}
+                          {r.user?.staffUser?.name || r.user?.email} · {fmtDateTime(r.createdAt)}
                         </p>
                       </div>
                     ))}

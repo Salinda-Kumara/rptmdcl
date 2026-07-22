@@ -7,7 +7,7 @@ import {
   FileSpreadsheet, FileText, Loader2,
 } from 'lucide-react';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
-import { formatFee, applicationTypeLabel } from '@/lib/applications-api';
+import { formatFee, applicationTypeLabel, fmtDateTime } from '@/lib/applications-api';
 import { useMyPermissions } from '@/lib/permissions';
 import { exportApplicationsExcel, exportApplicationsPdf } from '@/lib/export-applications';
 
@@ -445,7 +445,7 @@ export function ApplicationsPanel({ onNavigate }: Props) {
                   {formatFee(app.totalFee)}
                 </td>
                 <td className="px-4 py-3 text-xs text-slate-400 dark:text-gray-600">
-                  {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                  {fmtDateTime(app.submittedAt)}
                 </td>
                 <td className="pr-3 text-slate-300 dark:text-gray-600">
                   <ChevronRight className="h-4 w-4" />
@@ -966,7 +966,7 @@ export function ApplicationsPanel({ onNavigate }: Props) {
 
                     {/* Submitted */}
                     <td className="border-r-2 border-r-slate-200 px-3 py-2.5 align-middle text-xs text-slate-500">
-                      {app.submittedAt ? new Date(app.submittedAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                      {fmtDateTime(app.submittedAt)}
                     </td>
 
                     {/* Stage cells */}

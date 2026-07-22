@@ -23,6 +23,7 @@ import {
   STATUS_COLORS,
   formatFee,
   applicationTypeLabel,
+  fmtDateTime,
 } from '@/lib/applications-api';
 
 export default function StudentDashboard() {
@@ -200,7 +201,7 @@ export default function StudentDashboard() {
                         </p>
                         <p className="truncate text-xs text-slate-500">
                           {app.applicationSubjects.length} subject(s) · {formatFee(app.totalFee)} ·{' '}
-                          {new Date(app.createdAt).toLocaleDateString('en-LK', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {fmtDateTime(app.submittedAt ?? app.createdAt)}
                         </p>
                       </div>
                       <span

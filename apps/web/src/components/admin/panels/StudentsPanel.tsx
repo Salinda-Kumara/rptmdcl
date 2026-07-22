@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { adminApi, AdminStudent } from '@/lib/admin-api';
 import { staffApi, StaffApplication } from '@/lib/staff-api';
-import { STATUS_LABELS, STATUS_COLORS, formatFee, applicationTypeLabel } from '@/lib/applications-api';
+import { STATUS_LABELS, STATUS_COLORS, formatFee, applicationTypeLabel, fmtDateTime } from '@/lib/applications-api';
 
 const PAGE = 50;
 
@@ -101,7 +101,7 @@ function StudentDetailView({ student, onBack, onNavigateApp }: {
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {app.applicationSubjects?.length ?? 0} subject(s) · {formatFee(app.totalFee)}
-                  {app.submittedAt ? ` · Submitted ${new Date(app.submittedAt).toLocaleDateString('en-LK', { dateStyle: 'medium' })}` : ''}
+                  {app.submittedAt ? ` · Submitted ${fmtDateTime(app.submittedAt)}` : ''}
                 </p>
               </div>
               <ChevronRight className="h-5 w-5 shrink-0 text-slate-300 group-hover:text-amber-500" />

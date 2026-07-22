@@ -534,7 +534,7 @@ export async function buildApplicationPacket(
     payment && (payment.verificationStatus === 'VERIFIED' || payment.verificationStatus === 'REJECTED')
       ? {
           verdict: payment.verificationStatus === 'VERIFIED' ? 'APPROVED' : 'REJECTED',
-          date: payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+          date: payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—',
           by: payment.verifiedBy || '—',
         }
       : null;
