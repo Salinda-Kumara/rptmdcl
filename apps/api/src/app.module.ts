@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { StudentsModule } from './students/students.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { DocumentsModule } from './documents/documents.module';
+import { MedicalsModule } from './medicals/medicals.module';
 import { AdminModule } from './admin/admin.module';
 import { LogsModule } from './logs/logs.module';
 import { PublicModule } from './public/public.module';
@@ -27,6 +28,7 @@ import { PublicModule } from './public/public.module';
     StudentsModule,
     ApplicationsModule,
     DocumentsModule,
+    MedicalsModule,
     AdminModule,
     PublicModule,
   ],

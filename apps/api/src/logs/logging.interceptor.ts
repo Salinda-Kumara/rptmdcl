@@ -50,6 +50,15 @@ function describe(method: string, routePath: string): { action: string; entity?:
     return { action: `application.${verb(method)}`, entity: e };
   }
 
+  // ── Medical submissions (absent-on-exam-day certificate flow) ──
+  if (p.includes('/medicals')) {
+    const e = 'medical_submission';
+    if (/\/certificate$/.test(p)) return { action: 'medical.certificate_upload', entity: e };
+    if (/\/submit$/.test(p)) return { action: 'medical.submit', entity: e };
+    if (/\/review$/.test(p)) return { action: 'medical.review', entity: e };
+    return { action: `medical.${verb(method)}`, entity: e };
+  }
+
   // ── Documents (delete/download by id) ──
   if (p.includes('/documents')) {
     if (method === 'DELETE') return { action: 'document.delete', entity: 'document' };

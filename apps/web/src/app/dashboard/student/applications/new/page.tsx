@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { StudentShell } from '@/components/student/StudentShell';
 import { applicationsApi, studentsApi, documentsApi, Subject, ApplicantDetails, ScheduledExamInfo } from '@/lib/applications-api';
+import { medicalsApi, ApprovedMedical } from '@/lib/medicals-api';
 import apiClient from '@/lib/api-client';
 
 type Category = 'REPEAT' | 'MEDICAL' | '1ST_ATTEMPT';
@@ -143,6 +144,9 @@ export default function NewApplicationPage() {
   const [scheduledExams, setScheduledExams] = useState<ScheduledExamInfo[]>([]);
   const [batchList, setBatchList] = useState<string[]>([]);
   const [subjectSearch, setSubjectSearch] = useState('');
+  // Approved, unused medical submissions — offered for Medical-category subjects
+  // so the serial + verified certificate attach automatically.
+  const [approvedMedicals, setApprovedMedicals] = useState<ApprovedMedical[]>([]);
 
   // Personal details (pre-filled from the student record; corrections here are
   // saved only on this application, never written back to the master record).
@@ -157,6 +161,8 @@ export default function NewApplicationPage() {
       .finally(() => setLoadingSubjects(false));
 
     studentsApi.getScheduledExams().then(setScheduledExams).catch(() => {});
+
+    medicalsApi.approvedAvailable().then(setApprovedMedicals).catch(() => {});
 
     // Batch/intake list for the "Intake Details" autosuggest.
     apiClient.get<string[]>('/auth/batches').then((r) => setBatchList(r.data)).catch(() => {});
@@ -313,6 +319,13 @@ export default function NewApplicationPage() {
     const n = Number(v);
     return !Number.isFinite(n) || n <= 0 || n > 100;
   };
+
+  // Approved (unused) medical submissions covering a subject — selecting one
+  // auto-fills the serial; the server attaches the verified certificate.
+  const approvedForSubject = (subjectId: string) => approvedMedicals.filter((m) => m.subjectId === subjectId);
+  const usingApprovedMedical = (sel: SelectedSubject) =>
+    sel.category === 'MEDICAL' &&
+    approvedMedicals.some((m) => m.subjectId === sel.subjectId && m.serialNumber === sel.medicalApprovalSerial);
 
   // Per-subject missing/invalid fields, keyed by field name — drives the inline
   // red highlighting once the student has attempted to continue.
@@ -536,25 +549,68 @@ export default function NewApplicationPage() {
       {/* Medical approval serial + certificate — side by side */}
       {sel.category === 'MEDICAL' && (
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
-        <Field label="Medical Approval Serial Number">
-          <input
-            type="text" placeholder="e.g 123"
-            value={sel.medicalApprovalSerial}
-            onChange={(e) => updateField(subject.id, 'medicalApprovalSerial', e.target.value)}
-            className={inputCls('medicalApprovalSerial')}
-          />
-          <p className="mt-1 text-[11px] text-slate-400">
-            Check Approve list on SAB LMS:{' '}
-            <a
-              href="https://sablms.casrilanka.com/course/index.php?categoryid=1075"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-blue-600 underline hover:text-blue-700"
-            >
-              sablms.casrilanka.com
-            </a>
-          </p>
-        </Field>
+        <div className="space-y-3">
+          {/* Approved medical submission picker — auto-fills the serial and
+              attaches the already-verified certificate. */}
+          {approvedForSubject(subject.id).length > 0 && (
+            <Field label="Approved Medical Submission" hint="verified">
+              <select
+                value={usingApprovedMedical(sel) ? sel.medicalApprovalSerial : ''}
+                onChange={(e) => updateField(subject.id, 'medicalApprovalSerial', e.target.value)}
+                className={`w-full rounded-md border bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+                  usingApprovedMedical(sel)
+                    ? 'border-emerald-300 bg-emerald-50 focus:border-emerald-400 focus:ring-emerald-100'
+                    : 'border-slate-300 focus:border-blue-400 focus:ring-blue-100'
+                }`}
+              >
+                <option value="">— Enter serial manually —</option>
+                {approvedForSubject(subject.id).map((m) => (
+                  <option key={m.itemId} value={m.serialNumber}>
+                    {m.serialNumber} — absent {new Date(m.examDate).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </option>
+                ))}
+              </select>
+              {usingApprovedMedical(sel) && (
+                <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                  <Check className="h-3 w-3" /> Your verified medical certificate will be attached automatically.
+                </p>
+              )}
+            </Field>
+          )}
+          <Field label="Medical Approval Serial Number">
+            <input
+              type="text" placeholder="e.g 123"
+              value={sel.medicalApprovalSerial}
+              readOnly={usingApprovedMedical(sel)}
+              onChange={(e) => updateField(subject.id, 'medicalApprovalSerial', e.target.value)}
+              className={usingApprovedMedical(sel)
+                ? 'w-full cursor-not-allowed rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-sm text-emerald-800 focus:outline-none'
+                : inputCls('medicalApprovalSerial')}
+            />
+            {!usingApprovedMedical(sel) && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                Check Approve list on SAB LMS:{' '}
+                <a
+                  href="https://sablms.casrilanka.com/course/index.php?categoryid=1075"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-600 underline hover:text-blue-700"
+                >
+                  sablms.casrilanka.com
+                </a>
+              </p>
+            )}
+          </Field>
+        </div>
+        {usingApprovedMedical(sel) ? (
+          <div className="flex items-start gap-2 self-start rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+            <p className="text-xs text-emerald-800">
+              The medical certificate verified under <b className="font-mono">{sel.medicalApprovalSerial}</b> will be
+              attached to this subject automatically — no upload needed.
+            </p>
+          </div>
+        ) : (
         <div>
           <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
             Medical Certificate
@@ -604,6 +660,7 @@ export default function NewApplicationPage() {
             </label>
           </div>
         </div>
+        )}
         </div>
       )}
     </div>

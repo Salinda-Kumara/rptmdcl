@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, BarChart3, CalendarDays,
   LogOut, Menu, X, Users, GraduationCap, BookOpen,
   Layers, UserSquare2, UserCog, ChevronDown, Settings, Database, ScrollText,
-  PanelLeftClose, PanelLeftOpen, Boxes, MapPin, Loader2, TrendingUp,
+  PanelLeftClose, PanelLeftOpen, Boxes, MapPin, Loader2, TrendingUp, HeartPulse,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
@@ -38,10 +38,11 @@ const StudentsPanel        = dynamic(() => import('./panels/StudentsPanel').then
 const StudentManagePanel   = dynamic(() => import('./panels/StudentManagePanel').then((m) => m.StudentManagePanel), { loading: PanelFallback, ssr: false });
 const ReportsPanel         = dynamic(() => import('./panels/ReportsPanel').then((m) => m.ReportsPanel), { loading: PanelFallback, ssr: false });
 const AnalyticsPanel       = dynamic(() => import('./panels/AnalyticsPanel').then((m) => m.AnalyticsPanel), { loading: PanelFallback, ssr: false });
+const MedicalsPanel        = dynamic(() => import('./panels/MedicalsPanel').then((m) => m.MedicalsPanel), { loading: PanelFallback, ssr: false });
 const LogsPanel            = dynamic(() => import('./panels/LogsPanel').then((m) => m.LogsPanel), { loading: PanelFallback, ssr: false });
 
 type View =
-  | 'dashboard' | 'applications' | 'app-detail' | 'admissions' | 'reports' | 'analytics'
+  | 'dashboard' | 'applications' | 'app-detail' | 'admissions' | 'reports' | 'analytics' | 'medicals'
   | 'users' | 'students-import' | 'students' | 'programmes' | 'subjects' | 'batches' | 'schedules' | 'schedule-detail' | 'exam-staff' | 'exam-locations' | 'logs';
 
 interface TopNavItem { view: View; label: string; icon: React.ComponentType<{ className?: string }>; resource?: string; }
@@ -50,6 +51,7 @@ interface AdminNavItem { view: View; label: string; icon: React.ComponentType<{ 
 const TOP_NAV: TopNavItem[] = [
   { view: 'dashboard',        label: 'Dashboard',       icon: LayoutDashboard },
   { view: 'applications',     label: 'Applications',    icon: FileText,      resource: 'applications' },
+  { view: 'medicals',         label: 'Medical Submissions', icon: HeartPulse, resource: 'medicals' },
   { view: 'students-import',  label: 'Students',        icon: UserSquare2,   resource: 'students' },
   { view: 'schedules',        label: 'Exam Schedules',  icon: CalendarDays,  resource: 'schedules' },
   { view: 'admissions',       label: 'Admissions',      icon: GraduationCap, resource: 'admissions' },
@@ -80,6 +82,9 @@ export function AdminShell() {
   const { isAdmin, permissions, name } = useMyPermissions();
   const [view, setView] = useState<View>('dashboard');
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [selectedMedicalId, setSelectedMedicalId] = useState<string | undefined>(undefined);
+  const [medicalsReturnView, setMedicalsReturnView] = useState<string | undefined>(undefined);
+  const [selectedStudentReg, setSelectedStudentReg] = useState<string | undefined>(undefined);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [logsSerial, setLogsSerial] = useState<string | undefined>(undefined);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -96,10 +101,18 @@ export function AdminShell() {
   const MASTER_VIEWS: Set<View> = new Set(MASTER_NAV.map((n) => n.view));
   const ALLOCATION_VIEWS: Set<View> = new Set(ALLOCATION_NAV.map((n) => n.view));
 
-  const navigate = (v: string, id?: string) => {
+  const navigate = (v: string, id?: string, returnParam?: string) => {
     const nextView = v as View;
+    if (nextView === 'medicals') {
+      setSelectedMedicalId(id);
+      setMedicalsReturnView(view);
+      setSelectedStudentReg(returnParam);
+    }
+    if (nextView === 'students-import' || nextView === 'students') {
+      if (returnParam) setSelectedStudentReg(returnParam);
+    }
     setView(nextView);
-    if (id) setSelectedAppId(id);
+    if (id && nextView === 'app-detail') setSelectedAppId(id);
     // Opening Logs from the menu (no serial) clears any per-application filter.
     if (nextView === 'logs') setLogsSerial(undefined);
     setMobileOpen(false);
@@ -345,9 +358,17 @@ export function AdminShell() {
             {view === 'app-detail'     && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} onViewLogs={isAdmin ? openLogsForSerial : undefined} />}
             {view === 'admissions'     && <AdmissionsPanel />}
             {view === 'analytics'      && <AnalyticsPanel />}
+            {view === 'medicals'       && (
+              <MedicalsPanel
+                key={selectedMedicalId || 'all'}
+                initialId={selectedMedicalId}
+                onBack={medicalsReturnView ? () => navigate(medicalsReturnView, undefined, selectedStudentReg) : undefined}
+                backLabel={medicalsReturnView ? 'Back to Student Detail' : undefined}
+              />
+            )}
             {view === 'reports'        && <ReportsPanel />}
             {view === 'users'          && <UsersPanel />}
-            {view === 'students-import' && <StudentsPanel onNavigate={navigate} />}
+            {view === 'students-import' && <StudentsPanel onNavigate={navigate} initialStudentReg={selectedStudentReg} />}
             {view === 'students'       && <StudentManagePanel />}
             {view === 'programmes'     && <ProgrammesPanel />}
             {view === 'subjects'       && <SubjectsPanel />}

@@ -17,6 +17,7 @@ export const RESOURCES: ResourceDef[] = [
   { key: 'payments', label: 'Payments', description: 'Full can approve or reject payment verification' },
   { key: 'approvals', label: 'Final Approval', description: 'Full can give final approval to payment-verified applications (Exam Registrar)' },
   { key: 'rollback', label: 'Application Rollback', description: 'Full can roll an application back to its previous status' },
+  { key: 'medicals', label: 'Medical Submissions', description: 'Full can approve or reject medical certificate submissions (assigns the Medical Verification Serial)' },
   { key: 'students', label: 'Students', description: 'Full can create, edit, delete and import students' },
   { key: 'programmes', label: 'Programmes', description: 'Full can manage degree programmes' },
   { key: 'subjects', label: 'Subjects', description: 'Full can manage subjects' },

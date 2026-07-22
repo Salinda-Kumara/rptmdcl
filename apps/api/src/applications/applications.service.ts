@@ -154,7 +154,102 @@ export class ApplicationsService {
       },
     });
 
-    return application;
+    // Medical subjects whose serial matches one of the student's APPROVED
+    // medical submissions get the already-verified certificate attached
+    // automatically (no re-upload).
+    await this.attachVerifiedMedicalCertificates(student.id, application.id, userId);
+
+    return this.prisma.application.findUnique({
+      where: { id: application.id },
+      include: { applicationSubjects: { include: { subject: true } } },
+    });
+  }
+
+  /**
+   * For each Medical-category subject whose medicalApprovalSerial matches an
+   * APPROVED medical submission of this student covering the same subject,
+   * copy the submission's verified certificate documents onto the subject row
+   * (same storage object, new Document rows).
+   */
+  private async attachVerifiedMedicalCertificates(studentId: string, applicationId: string, userId: string) {
+    const subs = await this.prisma.applicationSubject.findMany({
+      where: { applicationId, category: 'MEDICAL', medicalApprovalSerial: { not: null } },
+      select: { id: true, subjectId: true, medicalApprovalSerial: true },
+    });
+    if (!subs.length) return;
+
+    const serials = [...new Set(subs.map((s) => s.medicalApprovalSerial!))];
+    const submissions = await this.prisma.medicalSubmission.findMany({
+      where: { studentId, status: 'APPROVED', serialNumber: { in: serials }, deletedAt: null },
+      include: {
+        items: { select: { subjectId: true } },
+        documents: { where: { deletedAt: null, documentType: 'MEDICAL_CERTIFICATE' } },
+      },
+    });
+    if (!submissions.length) return;
+    const bySerial = new Map(submissions.map((m) => [m.serialNumber!, m]));
+
+    for (const s of subs) {
+      const med = bySerial.get(s.medicalApprovalSerial!);
+      if (!med) continue; // manual / historical serial — student uploads the certificate themselves
+      if (!med.items.some((i) => i.subjectId === s.subjectId)) continue; // serial doesn't cover this subject
+      for (const d of med.documents) {
+        await this.prisma.document.create({
+          data: {
+            applicationId,
+            applicationSubjectId: s.id,
+            documentType: 'MEDICAL_CERTIFICATE',
+            fileName: d.fileName,
+            fileSize: d.fileSize,
+            mimeType: d.mimeType,
+            minioPath: d.minioPath, // shared storage object — deletion is ref-counted
+            uploadedBy: userId,
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Consume the approved medical absences referenced by this application's
+   * Medical subjects (matched by serial + subject). Each absence can back only
+   * one live application; freed again if that application is rejected/cancelled.
+   */
+  private async consumeMedicalItems(studentId: string, applicationId: string) {
+    const subs = await this.prisma.applicationSubject.findMany({
+      where: { applicationId, category: 'MEDICAL', medicalApprovalSerial: { not: null } },
+      select: { id: true, subjectId: true, medicalApprovalSerial: true, subject: { select: { code: true } } },
+    });
+    for (const s of subs) {
+      const submission = await this.prisma.medicalSubmission.findFirst({
+        where: { studentId, status: 'APPROVED', serialNumber: s.medicalApprovalSerial!, deletedAt: null },
+        include: { items: { where: { subjectId: s.subjectId } } },
+      });
+      if (!submission || !submission.items.length) continue; // manual serial — nothing to consume
+      if (submission.items.some((i) => i.usedByApplicationSubjectId === s.id)) continue; // already ours (resubmit)
+      const free = submission.items.find((i) => !i.usedByApplicationSubjectId);
+      if (!free) {
+        throw new ConflictException(
+          `Medical ${s.medicalApprovalSerial} for ${s.subject?.code ?? 'this subject'} has already been used on another application`,
+        );
+      }
+      await this.prisma.medicalSubmissionItem.update({
+        where: { id: free.id },
+        data: { usedByApplicationSubjectId: s.id },
+      });
+    }
+  }
+
+  /** Free medical absences consumed by this application (on reject / cancel). */
+  private async releaseMedicalItems(applicationId: string) {
+    const subs = await this.prisma.applicationSubject.findMany({
+      where: { applicationId }, select: { id: true },
+    });
+    if (!subs.length) return;
+    await this.prisma.medicalSubmissionItem.updateMany({
+      where: { usedByApplicationSubjectId: { in: subs.map((s) => s.id) } },
+      data: { usedByApplicationSubjectId: null },
+    });
   }
 
   async findAll(userId: string) {
@@ -260,6 +355,10 @@ export class ApplicationsService {
       throw new BadRequestException('A payment reference number is required');
     }
 
+    // Lock in the approved medical absences this application relies on — a
+    // conflict here (already used elsewhere) aborts the submission.
+    await this.consumeMedicalItems(student.id, id);
+
     const serialNumber = await this.generateSerialNumber();
 
     const updated = await this.prisma.application.update({
@@ -320,6 +419,8 @@ export class ApplicationsService {
           data: { applicationId: id, userId, content: dto.remark.trim() },
         }),
       ]);
+      // A rejected application no longer holds its approved medical absences.
+      await this.releaseMedicalItems(id);
       return this.findOneStaff(id);
     }
 
@@ -411,6 +512,11 @@ export class ApplicationsService {
         data: { applicationId: id, userId, content: `Declined subject ${row.subject?.code ?? subjectRowId}: ${dto.reason.trim()}` },
       }),
     ]);
+    // A declined subject frees its consumed medical absence (if any).
+    await this.prisma.medicalSubmissionItem.updateMany({
+      where: { usedByApplicationSubjectId: subjectRowId },
+      data: { usedByApplicationSubjectId: null },
+    });
     return this.findOneStaff(id);
   }
 
@@ -524,6 +630,9 @@ export class ApplicationsService {
         );
       }
       await this.prisma.$transaction(ops);
+      // Free the medical absences (a rollback that revives this application
+      // will not re-consume them automatically — rare enough to accept).
+      await this.releaseMedicalItems(id);
       return this.findOneStaff(id);
     }
 
@@ -614,6 +723,7 @@ export class ApplicationsService {
       }),
       this.prisma.remark.create({ data: { applicationId: id, userId, content: dto.remark.trim() } }),
     ]);
+    await this.releaseMedicalItems(id);
     return this.findOneStaff(id);
   }
 
@@ -663,10 +773,13 @@ export class ApplicationsService {
       throw new ForbiddenException('Application cannot be cancelled at this stage');
     }
 
-    return this.prisma.application.update({
+    const cancelled = await this.prisma.application.update({
       where: { id },
       data: { status: 'CANCELLED', deletedAt: new Date() },
     });
+    // Cancelled applications free any consumed medical absences.
+    await this.releaseMedicalItems(id);
+    return cancelled;
   }
 
   // Staff: get all applications (with optional filters).

@@ -98,6 +98,7 @@ model Student {
   batch         Batch?  @relation(fields: [batchNumber, intake], references: [batchNumber, intake])
   applications  Application[]
   notifications Notification[]
+  medicalSubmissions MedicalSubmission[]
 
   @@unique([batchNumber, nic, intake])
   @@index([email])
@@ -166,6 +167,7 @@ model Subject {
 
   programme           Programme @relation(fields: [programmeId], references: [id])
   applicationSubjects ApplicationSubject[]
+  medicalSubmissionItems MedicalSubmissionItem[]
 
   @@unique([code, programmeId])
   @@index([programmeId])
@@ -272,11 +274,15 @@ model Payment {
 
 model Document {
   id              String   @id @default(uuid())
-  applicationId   String
+  // Null when the document belongs to a medical submission instead of an
+  // examination application (exactly one of the two parents is set).
+  applicationId   String?
   // When set, this document belongs to a specific subject (e.g. a medical
   // certificate required for a Medical-category subject). Null for
   // application-level documents like the payment slip.
   applicationSubjectId String?
+  // Parent medical submission (absent-on-exam-day certificate flow).
+  medicalSubmissionId  String?
   documentType    String   // MEDICAL_CERTIFICATE, PAYMENT_SLIP
   fileName        String
   fileSize        Int
@@ -286,13 +292,63 @@ model Document {
   uploadedAt      DateTime @default(now())
   deletedAt       DateTime?
 
-  application        Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application        Application?        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   applicationSubject ApplicationSubject? @relation(fields: [applicationSubjectId], references: [id], onDelete: Cascade)
+  medicalSubmission  MedicalSubmission?  @relation(fields: [medicalSubmissionId], references: [id], onDelete: Cascade)
 
   @@index([applicationId])
   @@index([applicationSubjectId])
+  @@index([medicalSubmissionId])
   @@index([documentType])
   @@index([deletedAt])
+}
+
+// ==================== Medical Submissions ====================
+// A student absent on a scheduled exam date submits the medical certificate
+// within 15 days. On approval the system assigns a unique Medical Verification
+// Serial (MED/<date>/<seq>) which later auto-fills the student's next exam
+// application for the covered subjects (serial + verified certificate).
+
+model MedicalSubmission {
+  id               String    @id @default(uuid())
+  studentId        String
+  status           String    @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REJECTED
+  serialNumber     String?   @unique // Medical Verification Serial — assigned on approval
+  applicantDetails Json?     // snapshot of the paper form's personal block
+  totalDays        Int?      // "Total No. of Days" of medical leave
+  reviewRemarks    String?
+  reviewedBy       String?   // staff display name
+  reviewedAt       DateTime?
+  submittedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  student   Student                 @relation(fields: [studentId], references: [id])
+  items     MedicalSubmissionItem[]
+  documents Document[]
+
+  @@index([studentId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// One "Date / Subject" row of the form — a scheduled exam the student missed.
+model MedicalSubmissionItem {
+  id           String   @id @default(uuid())
+  submissionId String
+  subjectId    String
+  examDate     DateTime // the scheduled exam date the student was absent on
+  // Set when this approved absence is consumed by an exam application subject;
+  // freed again if that application is rejected or cancelled.
+  usedByApplicationSubjectId String? @unique
+  createdAt    DateTime @default(now())
+
+  submission MedicalSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  subject    Subject           @relation(fields: [subjectId], references: [id])
+
+  @@index([submissionId])
+  @@index([subjectId])
 }
 
 // ==================== Approval Workflow ====================

@@ -539,6 +539,15 @@ export async function buildApplicationPacket(
         }
       : null;
 
+  const approvedStamp: StampInfo | null =
+    app.status === 'APPROVED' || app.type === 'MEDICAL'
+      ? {
+          verdict: 'APPROVED',
+          date: app.submittedAt ? new Date(app.submittedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—',
+          by: (app as any).finalApprovedBy || (app as any).reviewedBy || 'Exam Division',
+        }
+      : null;
+
   // 2) attachments after the form — each fitted onto its own A4 page
   for (const d of docs) {
     const label = DOC_TYPE_LABELS[d.documentType as keyof typeof DOC_TYPE_LABELS] || d.fileName || 'Attachment';
@@ -553,7 +562,11 @@ export async function buildApplicationPacket(
     }
     const name = (d.fileName || '').toLowerCase();
     const isPdf = data.mimeType.includes('pdf') || name.endsWith('.pdf');
-    const stamp = d.documentType === 'PAYMENT_SLIP' ? paymentStamp : null;
+    const stamp = d.documentType === 'PAYMENT_SLIP'
+      ? paymentStamp
+      : (d.documentType === 'MEDICAL_CERTIFICATE' || app.status === 'APPROVED')
+        ? approvedStamp
+        : null;
 
     if (isPdf) {
       // Rasterize each page (pdf.js — the same engine the student's own PDF

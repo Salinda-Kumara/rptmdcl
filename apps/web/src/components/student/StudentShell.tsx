@@ -14,6 +14,7 @@ import {
   LifeBuoy,
   Mail,
   Phone,
+  HeartPulse,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
@@ -31,6 +32,7 @@ const NAV = [
   { href: '/dashboard/student', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/student/applications', label: 'My Applications', icon: FileText, exact: false },
   { href: '/dashboard/student/applications/new', label: 'New Application', icon: PlusCircle, exact: true },
+  { href: '/dashboard/student/medicals', label: 'Medical Certificate Submission', icon: HeartPulse, exact: false },
   { href: '/dashboard/student/profile', label: 'Profile', icon: User, exact: true },
 ];
 

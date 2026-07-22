@@ -113,11 +113,18 @@ export class DocumentsService {
   async getForDownload(userId: string, documentId: string, isStaff: boolean) {
     const document = await this.prisma.document.findFirst({
       where: { id: documentId, deletedAt: null },
-      include: { application: { include: { student: true } } },
+      include: {
+        application: { include: { student: true } },
+        medicalSubmission: { include: { student: true } },
+      },
     });
     if (!document) throw new NotFoundException('Document not found');
 
-    if (!isStaff && document.application.student?.userId !== userId) {
+    // The document belongs to either an application or a medical submission —
+    // in both cases the owning student (or any staff) may download it.
+    const ownerUserId =
+      document.application?.student?.userId ?? document.medicalSubmission?.student?.userId;
+    if (!isStaff && ownerUserId !== userId) {
       throw new ForbiddenException('You do not have access to this document');
     }
 
@@ -129,18 +136,37 @@ export class DocumentsService {
     const student = await this.studentFor(userId);
     const document = await this.prisma.document.findFirst({
       where: { id: documentId, deletedAt: null },
-      include: { application: true },
+      include: { application: true, medicalSubmission: true },
     });
     if (!document) throw new NotFoundException('Document not found');
 
-    if (document.application.studentId !== student.id) {
+    // Documents belong to an application OR a medical submission.
+    if (document.application) {
+      if (document.application.studentId !== student.id) {
+        throw new ForbiddenException('You do not have access to this document');
+      }
+      if (!EDITABLE_STATUSES.includes(document.application.status)) {
+        throw new ForbiddenException('Documents can no longer be removed after submission');
+      }
+    } else if (document.medicalSubmission) {
+      if (document.medicalSubmission.studentId !== student.id) {
+        throw new ForbiddenException('You do not have access to this document');
+      }
+      if (document.medicalSubmission.status !== 'DRAFT') {
+        throw new ForbiddenException('Certificates cannot be removed after submission');
+      }
+    } else {
       throw new ForbiddenException('You do not have access to this document');
     }
-    if (!EDITABLE_STATUSES.includes(document.application.status)) {
-      throw new ForbiddenException('Documents can no longer be removed after submission');
-    }
 
-    await this.storage.remove(document.minioPath);
+    // A verified medical certificate is COPIED onto exam applications by row
+    // (sharing the same storage object) — only delete the underlying file when
+    // no other live document row still points at it.
+    const shared = await this.prisma.document.count({
+      where: { minioPath: document.minioPath, deletedAt: null, id: { not: documentId } },
+    });
+    if (shared === 0) await this.storage.remove(document.minioPath);
+
     return this.prisma.document.update({
       where: { id: documentId },
       data: { deletedAt: new Date() },

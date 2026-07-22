@@ -12,6 +12,10 @@ import { useMyPermissions, can } from '@/lib/permissions';
 import { STATUS_LABELS, STATUS_COLORS, formatFee, DOC_TYPE_LABELS, applicationTypeLabel, fmtDateTime } from '@/lib/applications-api';
 import { printApplicationPacket, openBlankTab } from '@/lib/application-form-pdf';
 import { stampPaymentSlip } from '@/lib/stamp-payment-slip';
+import apiClient from '@/lib/api-client';
+
+const escapeHtml = (str?: string | null) =>
+  str ? String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '';
 
 const APPLICANT_FIELDS: { key: string; label: string }[] = [
   { key: 'fullName',           label: 'Full Name' },
@@ -362,6 +366,56 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         return;
       }
+
+      // If document is a medical certificate or application is approved, show the APPROVED watermark stamp overlay
+      const isApprovedApp = app?.status === 'APPROVED';
+      const isMedicalCert = doc.documentType === 'MEDICAL_CERTIFICATE' || (doc as any).medicalApprovalSerial;
+      if (isApprovedApp || isMedicalCert) {
+        const res = await apiClient.get(`/documents/${doc.id}/download`, { responseType: 'blob' });
+        const blobUrl = URL.createObjectURL(res.data);
+        const mime = (res.data as Blob).type || '';
+
+        const isImage = mime.startsWith('image/');
+        const serial = app?.serialNumber || (doc as any).medicalApprovalSerial || '';
+        const approvedBy = (app as any)?.finalApprovedBy || (app as any)?.reviewedBy || (app as any)?.approvals?.[0]?.user?.staffUser?.name || name || 'Exam Division';
+        const approvedDate = app?.submittedAt ? fmtDateTime((app as any)?.finalApprovedAt || app?.submittedAt) : '';
+
+        const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${escapeHtml(doc.fileName)}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#f1f5f9;font-family:system-ui,sans-serif}
+  .wrap{position:relative;width:100%;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  img.doc{max-width:100%;max-height:100vh;display:block}
+  iframe.doc{width:100%;height:100vh;border:none}
+  .stamp{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);
+    pointer-events:none;z-index:999;
+    border:6px solid rgba(22,163,74,.45);border-radius:16px;padding:18px 48px;
+    color:rgba(22,163,74,.45);font-size:64px;font-weight:900;letter-spacing:6px;
+    text-transform:uppercase;text-align:center;line-height:1.3;
+    font-family:system-ui,sans-serif;white-space:nowrap}
+  .stamp .detail{font-size:16px;letter-spacing:1px;display:block;margin-top:6px;text-transform:none;font-weight:700}
+  .stamp .serial{font-size:20px;letter-spacing:2px;display:block;margin-top:4px}
+  @media print{
+    body{background:#fff}
+    .stamp{position:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+      color:rgba(22,163,74,.35)!important;border-color:rgba(22,163,74,.35)!important}
+    img.doc{max-height:none;width:100%}
+    iframe.doc{height:100vh}
+  }
+</style></head><body>
+<div class="wrap">
+  ${isImage
+    ? `<img class="doc" src="${blobUrl}" alt="${escapeHtml(doc.fileName)}">`
+    : `<iframe class="doc" src="${blobUrl}"></iframe>`}
+  <div class="stamp">Approved${serial ? `<span class="serial">${escapeHtml(serial)}</span>` : ''}${approvedBy ? `<span class="detail">By: ${escapeHtml(approvedBy)}</span>` : ''}${approvedDate ? `<span class="detail">${escapeHtml(approvedDate)}</span>` : ''}</div>
+</div></body></html>`;
+
+        const viewerBlob = new Blob([html], { type: 'text/html' });
+        window.open(URL.createObjectURL(viewerBlob), '_blank');
+        return;
+      }
+
       window.open(await staffApi.documentUrl(doc.id), '_blank');
     } catch { setError('Could not open document'); }
     finally { setBusyDoc(null); }

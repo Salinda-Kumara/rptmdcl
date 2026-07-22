@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import {
   LayoutDashboard, FileText, CalendarDays, GraduationCap,
   BarChart3, LogOut, Menu, X, Crown, UserSquare2,
-  PanelLeftClose, PanelLeftOpen, Loader2, TrendingUp,
+  PanelLeftClose, PanelLeftOpen, Loader2, TrendingUp, HeartPulse,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
@@ -29,8 +29,9 @@ const ScheduleDetailPanel    = dynamic(() => import('@/components/admin/panels/S
 const AdmissionsPanel        = dynamic(() => import('@/components/admin/panels/AdmissionsPanel').then((m) => m.AdmissionsPanel), { loading: PanelFallback, ssr: false });
 const StudentsPanel          = dynamic(() => import('@/components/admin/panels/StudentsPanel').then((m) => m.StudentsPanel), { loading: PanelFallback, ssr: false });
 const AnalyticsPanel         = dynamic(() => import('@/components/admin/panels/AnalyticsPanel').then((m) => m.AnalyticsPanel), { loading: PanelFallback, ssr: false });
+const MedicalsPanel          = dynamic(() => import('@/components/admin/panels/MedicalsPanel').then((m) => m.MedicalsPanel), { loading: PanelFallback, ssr: false });
 
-type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'admissions' | 'students' | 'analytics' | 'reports' | 'admin';
+type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'admissions' | 'students' | 'analytics' | 'medicals' | 'reports' | 'admin';
 
 interface NavItem {
   view: View;
@@ -43,6 +44,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { view: 'dashboard',    label: 'Dashboard',     icon: LayoutDashboard },
   { view: 'applications', label: 'Applications',  icon: FileText,      resource: 'applications' },
+  { view: 'medicals',     label: 'Medical Submissions', icon: HeartPulse, resource: 'medicals' },
   { view: 'schedules',    label: 'Schedules',     icon: CalendarDays,  resource: 'schedules' },
   { view: 'admissions',   label: 'Admissions',    icon: GraduationCap, resource: 'admissions' },
   { view: 'students',     label: 'Students',      icon: UserSquare2,   resource: 'students' },
@@ -65,6 +67,9 @@ export function StaffShell() {
   const { isAdmin, permissions, name } = useMyPermissions();
   const [view, setView] = useState<View>('dashboard');
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [selectedMedicalId, setSelectedMedicalId] = useState<string | undefined>(undefined);
+  const [medicalsReturnView, setMedicalsReturnView] = useState<string | undefined>(undefined);
+  const [selectedStudentReg, setSelectedStudentReg] = useState<string | undefined>(undefined);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -73,9 +78,18 @@ export function StaffShell() {
   useEffect(() => { if (localStorage.getItem('staffSidebarCollapsed') === '1') setCollapsed(true); }, []);
   const applyCollapsed = (n: boolean) => { setCollapsed(n); localStorage.setItem('staffSidebarCollapsed', n ? '1' : '0'); };
 
-  const navigate = (v: string, id?: string) => {
-    setView(v as View);
-    if (id) setSelectedAppId(id);
+  const navigate = (v: string, id?: string, returnParam?: string) => {
+    const nextView = v as View;
+    if (nextView === 'medicals') {
+      setSelectedMedicalId(id);
+      setMedicalsReturnView(view);
+      setSelectedStudentReg(returnParam);
+    }
+    if (nextView === 'students') {
+      if (returnParam) setSelectedStudentReg(returnParam);
+    }
+    setView(nextView);
+    if (id && nextView === 'app-detail') setSelectedAppId(id);
     setMobileOpen(false);
     window.scrollTo({ top: 0 });
   };
@@ -210,8 +224,16 @@ export function StaffShell() {
             {view === 'schedules'    && <ExamSchedulesPanel onOpen={openSchedule} />}
             {view === 'schedule-detail' && selectedScheduleId && <ScheduleDetailPanel scheduleId={selectedScheduleId} onBack={() => navigate('schedules')} />}
             {view === 'admissions'   && <AdmissionsPanel />}
-            {view === 'students'     && <StudentsPanel onNavigate={navigate} />}
+            {view === 'students'     && <StudentsPanel onNavigate={navigate} initialStudentReg={selectedStudentReg} />}
             {view === 'analytics'    && <AnalyticsPanel />}
+            {view === 'medicals'     && (
+              <MedicalsPanel
+                key={selectedMedicalId || 'all'}
+                initialId={selectedMedicalId}
+                onBack={medicalsReturnView ? () => navigate(medicalsReturnView, undefined, selectedStudentReg) : undefined}
+                backLabel={medicalsReturnView ? 'Back to Student Detail' : undefined}
+              />
+            )}
             {view === 'reports'      && <ReportsPanel />}
             {view === 'admin'        && <ComingSoon label="Admin Console" />}
           </main>
