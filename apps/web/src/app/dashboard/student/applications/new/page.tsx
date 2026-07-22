@@ -324,8 +324,6 @@ export default function NewApplicationPage() {
     if (!s.upcomingExamDate || s.upcomingExamDate < todayISO) e.add('upcomingExamDate');
     if (!s.previousExamIntake.trim()) e.add('previousExamIntake');
     if (s.category === 'REPEAT' && !s.gradeEarned.trim()) e.add('gradeEarned');
-    if (s.category === 'MEDICAL' && s.medicalCertificates.length === 0) e.add('medicalCertificates');
-    if (s.category === 'MEDICAL' && !s.medicalApprovalSerial.trim()) e.add('medicalApprovalSerial');
     return e;
   };
 
@@ -341,8 +339,6 @@ export default function NewApplicationPage() {
       if (s.upcomingExamDate < todayISO) { setError(`Upcoming Exam Date cannot be in the past (${code})`); return false; }
       if (!s.previousExamIntake.trim()) { setError(`Previous exam Intake Details are required (${code})`); return false; }
       if (s.category === 'REPEAT' && !s.gradeEarned.trim()) { setError(`Grade Earned is required (${code})`); return false; }
-      if (s.category === 'MEDICAL' && s.medicalCertificates.length === 0) { setError(`At least one medical certificate is required (${code})`); return false; }
-      if (s.category === 'MEDICAL' && !s.medicalApprovalSerial.trim()) { setError(`Medical Approval Serial Number is required (${code})`); return false; }
     }
     setError('');
     return true;
@@ -540,7 +536,7 @@ export default function NewApplicationPage() {
       {/* Medical approval serial + certificate — side by side */}
       {sel.category === 'MEDICAL' && (
         <div className="grid grid-cols-1 gap-x-4 gap-y-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
-        <Field label="Medical Approval Serial Number" required>
+        <Field label="Medical Approval Serial Number">
           <input
             type="text" placeholder="e.g 123"
             value={sel.medicalApprovalSerial}
@@ -561,7 +557,7 @@ export default function NewApplicationPage() {
         </Field>
         <div>
           <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
-            Medical Certificate <span className="text-red-500">*</span>
+            Medical Certificate
             <span className="font-normal text-slate-400">(PDF, JPG or PNG · max 10MB)</span>
           </label>
           <div className="space-y-2">
@@ -595,7 +591,7 @@ export default function NewApplicationPage() {
                   {sel.medicalCertificates.length > 0 ? 'Add another certificate' : 'Attach certificate'}
                 </span>
                 <span className="block truncate text-xs text-slate-400">
-                  {sel.medicalCertificates.length > 0 ? 'You can attach more than one' : 'At least one required · click to upload'}
+                  {sel.medicalCertificates.length > 0 ? 'You can attach more than one' : 'Optional · click to upload'}
                 </span>
               </span>
               <input

@@ -244,27 +244,12 @@ export class ApplicationsService {
       select: { documentType: true, applicationSubjectId: true },
     });
 
-    // 1. A payment slip is always required.
+    // A payment slip is always required. Medical certificates are optional —
+    // students may attach one per subject, but submission isn't blocked without it.
     const presentTypes = new Set(docs.map((d) => d.documentType));
     if (!presentTypes.has('PAYMENT_SLIP')) {
       throw new BadRequestException(
         `Please attach the following before submitting: ${DOC_LABELS['PAYMENT_SLIP']}`,
-      );
-    }
-
-    // 2. Every Medical-category subject needs its own medical certificate.
-    const medicalSubjects = await this.prisma.applicationSubject.findMany({
-      where: { applicationId: id, category: 'MEDICAL' },
-      include: { subject: { select: { code: true } } },
-    });
-    const certifiedSubjectIds = new Set(
-      docs.filter((d) => d.documentType === 'MEDICAL_CERTIFICATE' && d.applicationSubjectId)
-        .map((d) => d.applicationSubjectId),
-    );
-    const uncertified = medicalSubjects.filter((s) => !certifiedSubjectIds.has(s.id));
-    if (uncertified.length > 0) {
-      throw new BadRequestException(
-        `Please attach a medical certificate for each medical subject: ${uncertified.map((s) => s.subject?.code ?? s.subjectId).join(', ')}`,
       );
     }
 
