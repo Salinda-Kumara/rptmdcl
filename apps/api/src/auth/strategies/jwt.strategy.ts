@@ -30,7 +30,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
 
-    if (!user) {
+    // Reject deactivated staff accounts and deleted students — an existing
+    // token must stop working once the account/student is removed.
+    if (!user || user.deletedAt || user.student?.deletedAt) {
       return null;
     }
 

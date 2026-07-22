@@ -33,12 +33,19 @@ export class AuthService {
       where: {
         batchNumber,
         nic,
+        deletedAt: null, // a deleted student must not be able to log in
       },
       include: { user: true },
     });
 
     if (!student) {
       throw new UnauthorizedException('Invalid batch number or NIC');
+    }
+
+    // A previously-created account may have been deactivated when the student
+    // was deleted — block it even if the student row was somehow restored.
+    if (student.user?.deletedAt) {
+      throw new UnauthorizedException('This account has been deactivated');
     }
 
     let user = student.user;
@@ -90,9 +97,10 @@ export class AuthService {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
+        include: { student: true },
       });
 
-      if (!user) {
+      if (!user || user.deletedAt || user.student?.deletedAt) {
         throw new UnauthorizedException('User not found');
       }
 

@@ -718,9 +718,15 @@ export class AdminService {
   }
 
   async deleteStudent(id: string) {
-    const student = await this.prisma.student.findFirst({ where: { id, deletedAt: null } });
+    const student = await this.prisma.student.findFirst({ where: { id, deletedAt: null }, include: { user: true } });
     if (!student) throw new NotFoundException('Student not found');
-    await this.prisma.student.update({ where: { id }, data: { deletedAt: new Date() } });
+    const now = new Date();
+    await this.prisma.student.update({ where: { id }, data: { deletedAt: now } });
+    // Deactivate the linked login account so any existing session/token for this
+    // student stops working immediately (student login is by batch/NIC, no password).
+    if (student.user && !student.user.deletedAt) {
+      await this.prisma.user.update({ where: { id: student.user.id }, data: { deletedAt: now } });
+    }
     return { success: true };
   }
 
