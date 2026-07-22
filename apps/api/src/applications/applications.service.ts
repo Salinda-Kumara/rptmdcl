@@ -812,6 +812,125 @@ export class ApplicationsService {
     };
   }
 
+  // Management analytics — one aggregate payload driving the Analytics dashboard.
+  // All figures are over non-draft applications; subject-level breakdowns exclude
+  // declined subjects (they aren't real demand).
+  async getAnalytics(dateFrom?: string, dateTo?: string) {
+    const where: any = { deletedAt: null, status: { not: 'DRAFT' } };
+    // Filter by submission date when a range is given (inclusive of both days).
+    if (dateFrom || dateTo) {
+      where.submittedAt = {};
+      if (dateFrom) { const f = new Date(dateFrom); f.setHours(0, 0, 0, 0); where.submittedAt.gte = f; }
+      if (dateTo) { const t = new Date(dateTo); t.setHours(23, 59, 59, 999); where.submittedAt.lte = t; }
+    }
+    const apps = await this.prisma.application.findMany({
+      where,
+      select: {
+        id: true, type: true, status: true, submittedAt: true, studentId: true,
+        student: { select: { batchNumber: true } },
+        applicationSubjects: {
+          select: { category: true, status: true, upcomingExamIntake: true, subject: { select: { code: true, name: true } } },
+        },
+        payment: { select: { amount: true, verificationStatus: true } },
+      },
+    });
+
+    const PENDING_STATUSES = ['SUBMITTED', 'PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'RETURNED', 'UNDER_REVIEW'];
+
+    let approved = 0, rejected = 0, pending = 0, verifiedRevenue = 0;
+    let repeatApps = 0, medicalApps = 0;
+    let totalSubjects = 0;
+    const students = new Set<string>();
+    const subjMap = new Map<string, { code: string; name: string; repeat: number; medical: number; firstAttempt: number; total: number }>();
+    const cat = { REPEAT: 0, MEDICAL: 0, '1ST_ATTEMPT': 0 } as Record<string, number>;
+    const batchMap = new Map<string, number>();
+    const intakeMap = new Map<string, number>();
+    const dayMap = new Map<string, number>();
+    // Funnel: furthest stage each application reached.
+    let fSubmitted = 0, fFinance = 0, fVerified = 0, fApproved = 0;
+
+    for (const a of apps) {
+      students.add(a.studentId);
+      if (a.status === 'APPROVED') approved++;
+      else if (a.status === 'REJECTED' || a.status === 'PAYMENT_REJECTED') rejected++;
+      if (PENDING_STATUSES.includes(a.status)) pending++;
+      if (a.type === 'MEDICAL') medicalApps++; else repeatApps++;
+      if (a.payment?.verificationStatus === 'VERIFIED') verifiedRevenue += a.payment.amount ?? 0;
+
+      // Funnel (monotonic).
+      fSubmitted++;
+      if (['PAYMENT_PENDING', 'PAYMENT_VERIFIED', 'PAYMENT_REJECTED', 'APPROVED'].includes(a.status)) fFinance++;
+      if (['PAYMENT_VERIFIED', 'APPROVED'].includes(a.status)) fVerified++;
+      if (a.status === 'APPROVED') fApproved++;
+
+      // Submissions over time (by day).
+      if (a.submittedAt) {
+        const day = a.submittedAt.toISOString().slice(0, 10);
+        dayMap.set(day, (dayMap.get(day) ?? 0) + 1);
+      }
+
+      // Batch demand = applications per batch.
+      const batch = (a.student?.batchNumber || '—').trim() || '—';
+      batchMap.set(batch, (batchMap.get(batch) ?? 0) + 1);
+
+      // Subject-level breakdowns (active subjects only).
+      for (const s of a.applicationSubjects) {
+        if (s.status === 'DECLINED') continue;
+        totalSubjects++;
+        const code = s.subject?.code ?? '—';
+        const rec = subjMap.get(code) ?? { code, name: s.subject?.name ?? '', repeat: 0, medical: 0, firstAttempt: 0, total: 0 };
+        if (s.category === 'REPEAT') rec.repeat++;
+        else if (s.category === 'MEDICAL') rec.medical++;
+        else rec.firstAttempt++;
+        rec.total++;
+        subjMap.set(code, rec);
+        cat[s.category] = (cat[s.category] ?? 0) + 1;
+        const it = (s.upcomingExamIntake || '').trim();
+        if (it) intakeMap.set(it, (intakeMap.get(it) ?? 0) + 1);
+      }
+    }
+
+    const topN = <T,>(m: Map<string, number>, n: number, key: string) =>
+      [...m.entries()].sort((x, y) => y[1] - x[1]).slice(0, n).map(([k, v]) => ({ [key]: k, count: v })) as any as T[];
+
+    const submissionsOverTime = [...dayMap.entries()]
+      .sort((x, y) => x[0].localeCompare(y[0]))
+      .map(([date, count]) => ({ date, count }));
+
+    return {
+      kpis: {
+        totalApplications: apps.length,
+        approved,
+        rejected,
+        pending,
+        approvalRate: apps.length ? Math.round((approved / apps.length) * 100) : 0,
+        uniqueStudents: students.size,
+        totalSubjects,
+        verifiedRevenue,
+        avgSubjectsPerApp: apps.length ? Math.round((totalSubjects / apps.length) * 10) / 10 : 0,
+      },
+      byType: [
+        { type: 'Repeat', count: repeatApps },
+        { type: 'Medical', count: medicalApps },
+      ],
+      byCategory: [
+        { category: 'Repeat', count: cat.REPEAT ?? 0 },
+        { category: 'Medical', count: cat.MEDICAL ?? 0 },
+        { category: '1st Attempt', count: cat['1ST_ATTEMPT'] ?? 0 },
+      ],
+      topSubjects: [...subjMap.values()].sort((x, y) => y.total - x.total).slice(0, 12),
+      topBatches: topN<{ batch: string; count: number }>(batchMap, 10, 'batch'),
+      topIntakes: topN<{ intake: string; count: number }>(intakeMap, 10, 'intake'),
+      funnel: [
+        { stage: 'Submitted', count: fSubmitted },
+        { stage: 'To Finance', count: fFinance },
+        { stage: 'Payment Verified', count: fVerified },
+        { stage: 'Approved', count: fApproved },
+      ],
+      submissionsOverTime,
+    };
+  }
+
   // Roll an application back one stage. Used to correct a wrongly-processed
   // application (e.g. accepted by mistake). Reverts the status AND the related
   // approval / payment records so the earlier stage can act on it again, and

@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, BarChart3, CalendarDays,
   LogOut, Menu, X, Users, GraduationCap, BookOpen,
   Layers, UserSquare2, UserCog, ChevronDown, Settings, Database, ScrollText,
-  PanelLeftClose, PanelLeftOpen, Boxes, MapPin, Loader2,
+  PanelLeftClose, PanelLeftOpen, Boxes, MapPin, Loader2, TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
@@ -37,10 +37,11 @@ const ApplicationDetailPanel = dynamic(() => import('@/components/staff/panels/A
 const StudentsPanel        = dynamic(() => import('./panels/StudentsPanel').then((m) => m.StudentsPanel), { loading: PanelFallback, ssr: false });
 const StudentManagePanel   = dynamic(() => import('./panels/StudentManagePanel').then((m) => m.StudentManagePanel), { loading: PanelFallback, ssr: false });
 const ReportsPanel         = dynamic(() => import('./panels/ReportsPanel').then((m) => m.ReportsPanel), { loading: PanelFallback, ssr: false });
+const AnalyticsPanel       = dynamic(() => import('./panels/AnalyticsPanel').then((m) => m.AnalyticsPanel), { loading: PanelFallback, ssr: false });
 const LogsPanel            = dynamic(() => import('./panels/LogsPanel').then((m) => m.LogsPanel), { loading: PanelFallback, ssr: false });
 
 type View =
-  | 'dashboard' | 'applications' | 'app-detail' | 'admissions' | 'reports'
+  | 'dashboard' | 'applications' | 'app-detail' | 'admissions' | 'reports' | 'analytics'
   | 'users' | 'students-import' | 'students' | 'programmes' | 'subjects' | 'batches' | 'schedules' | 'schedule-detail' | 'exam-staff' | 'exam-locations' | 'logs';
 
 interface TopNavItem { view: View; label: string; icon: React.ComponentType<{ className?: string }>; resource?: string; }
@@ -52,6 +53,7 @@ const TOP_NAV: TopNavItem[] = [
   { view: 'students-import',  label: 'Students',        icon: UserSquare2,   resource: 'students' },
   { view: 'schedules',        label: 'Exam Schedules',  icon: CalendarDays,  resource: 'schedules' },
   { view: 'admissions',       label: 'Admissions',      icon: GraduationCap, resource: 'admissions' },
+  { view: 'analytics',        label: 'Analytics',       icon: TrendingUp,    resource: 'analytics' },
   { view: 'reports',          label: 'Reports',         icon: BarChart3,     resource: 'reports' },
 ];
 
@@ -342,6 +344,7 @@ export function AdminShell() {
             {view === 'applications'   && <ApplicationsPanel onNavigate={navigate} />}
             {view === 'app-detail'     && selectedAppId && <ApplicationDetailPanel id={selectedAppId} onBack={() => navigate('applications')} onViewLogs={isAdmin ? openLogsForSerial : undefined} />}
             {view === 'admissions'     && <AdmissionsPanel />}
+            {view === 'analytics'      && <AnalyticsPanel />}
             {view === 'reports'        && <ReportsPanel />}
             {view === 'users'          && <UsersPanel />}
             {view === 'students-import' && <StudentsPanel onNavigate={navigate} />}

@@ -75,6 +75,18 @@ export class ApplicationsController {
     return this.applicationsService.getStats();
   }
 
+  // Management analytics dashboard. Declared before ':id' so 'analytics' isn't
+  // matched as an application id. Gated by the dedicated analytics permission.
+  @Get('analytics')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('analytics', 'VIEW')
+  @ApiOperation({ summary: 'Get analytics dashboard data (staff)' })
+  @ApiQuery({ name: 'dateFrom', required: false, description: 'ISO date YYYY-MM-DD' })
+  @ApiQuery({ name: 'dateTo', required: false, description: 'ISO date YYYY-MM-DD' })
+  getAnalytics(@Query('dateFrom') dateFrom?: string, @Query('dateTo') dateTo?: string) {
+    return this.applicationsService.getAnalytics(dateFrom, dateTo);
+  }
+
   @Get()
   @UseGuards(PermissionsGuard)
   @RequirePermission('applications', 'VIEW')

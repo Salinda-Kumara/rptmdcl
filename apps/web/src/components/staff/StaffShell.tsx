@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import {
   LayoutDashboard, FileText, CalendarDays, GraduationCap,
   BarChart3, LogOut, Menu, X, Crown, UserSquare2,
-  PanelLeftClose, PanelLeftOpen, Loader2,
+  PanelLeftClose, PanelLeftOpen, Loader2, TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '@/lib/use-auth';
 import { ProtectedLayout } from '@/components/auth/ProtectedLayout';
@@ -28,8 +28,9 @@ const ExamSchedulesPanel     = dynamic(() => import('@/components/admin/panels/E
 const ScheduleDetailPanel    = dynamic(() => import('@/components/admin/panels/ScheduleDetailPanel').then((m) => m.ScheduleDetailPanel), { loading: PanelFallback, ssr: false });
 const AdmissionsPanel        = dynamic(() => import('@/components/admin/panels/AdmissionsPanel').then((m) => m.AdmissionsPanel), { loading: PanelFallback, ssr: false });
 const StudentsPanel          = dynamic(() => import('@/components/admin/panels/StudentsPanel').then((m) => m.StudentsPanel), { loading: PanelFallback, ssr: false });
+const AnalyticsPanel         = dynamic(() => import('@/components/admin/panels/AnalyticsPanel').then((m) => m.AnalyticsPanel), { loading: PanelFallback, ssr: false });
 
-type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'admissions' | 'students' | 'reports' | 'admin';
+type View = 'dashboard' | 'applications' | 'app-detail' | 'schedules' | 'schedule-detail' | 'admissions' | 'students' | 'analytics' | 'reports' | 'admin';
 
 interface NavItem {
   view: View;
@@ -45,6 +46,7 @@ const NAV: NavItem[] = [
   { view: 'schedules',    label: 'Schedules',     icon: CalendarDays,  resource: 'schedules' },
   { view: 'admissions',   label: 'Admissions',    icon: GraduationCap, resource: 'admissions' },
   { view: 'students',     label: 'Students',      icon: UserSquare2,   resource: 'students' },
+  { view: 'analytics',    label: 'Analytics',     icon: TrendingUp,    resource: 'analytics' },
   { view: 'reports',      label: 'Reports',       icon: BarChart3,     resource: 'reports' },
   { view: 'admin',        label: 'Admin Console', icon: Crown,         adminOnly: true },
 ];
@@ -209,6 +211,7 @@ export function StaffShell() {
             {view === 'schedule-detail' && selectedScheduleId && <ScheduleDetailPanel scheduleId={selectedScheduleId} onBack={() => navigate('schedules')} />}
             {view === 'admissions'   && <AdmissionsPanel />}
             {view === 'students'     && <StudentsPanel onNavigate={navigate} />}
+            {view === 'analytics'    && <AnalyticsPanel />}
             {view === 'reports'      && <ReportsPanel />}
             {view === 'admin'        && <ComingSoon label="Admin Console" />}
           </main>
