@@ -38,10 +38,11 @@ const WORKFLOW = ['DRAFT', 'SUBMITTED', 'PAYMENT_PENDING', 'PAYMENT_VERIFIED', '
 // so the options are capped to the fail-range grades.
 const GRADE_OPTIONS = ['C-', 'D+', 'D', 'E'];
 
-// Mandatory attachments per application type (mirrors the API rule).
+// Mandatory attachments per application type (mirrors the API rule). Medical
+// certificates are optional, so only the payment slip is required for either type.
 const REQUIRED_DOCS: Record<'MEDICAL' | 'REPEAT', DocumentType[]> = {
   REPEAT: ['PAYMENT_SLIP'],
-  MEDICAL: ['PAYMENT_SLIP', 'MEDICAL_CERTIFICATE'],
+  MEDICAL: ['PAYMENT_SLIP'],
 };
 
 export default function ApplicationDetailPage() {
