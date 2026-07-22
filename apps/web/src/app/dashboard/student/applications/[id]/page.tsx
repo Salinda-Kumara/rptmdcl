@@ -283,7 +283,7 @@ export default function ApplicationDetailPage() {
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
               <div>
                 <p className="text-sm font-semibold text-emerald-800">Application Approved</p>
-                <p className="mt-0.5 text-sm text-emerald-700">You can collect your admission from the Examination Division.</p>
+                <p className="mt-0.5 text-sm text-emerald-700">You can collect your admission card from the Examination Division on the exam date.</p>
               </div>
             </div>
           )}
