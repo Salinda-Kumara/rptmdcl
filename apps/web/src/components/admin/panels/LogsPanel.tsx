@@ -3,9 +3,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ScrollText, RefreshCw, Search, ChevronLeft, ChevronRight, Inbox,
-  Filter, X,
+  Filter, X, Download, Loader2,
 } from 'lucide-react';
 import { logsApi, ActionLog } from '@/lib/logs-api';
+import { exportLogsExcel } from '@/lib/export-logs';
 
 // Human-readable "what happened" for each recorded action code.
 const ACTION_LABELS: Record<string, string> = {
@@ -101,6 +102,7 @@ export function LogsPanel({ serial: initialSerial }: Props) {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [actionOptions, setActionOptions] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -121,6 +123,45 @@ export function LogsPanel({ serial: initialSerial }: Props) {
   const anyFilter = !!(search || action || serial || dateFrom || dateTo);
   const clearAll = () => { setSearch(''); setAction(''); setSerial(initialSerial || ''); setDateFrom(''); setDateTo(''); };
 
+  // Export the CURRENT filter selection (all matching rows, not just this page).
+  const exportExcel = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const all: ActionLog[] = [];
+      const size = 200;
+      for (let p = 1; p <= 200; p++) { // hard cap 40k rows
+        const r = await logsApi.list({ search, action, serial, dateFrom, dateTo, page: p, pageSize: size });
+        all.push(...r.items);
+        if (r.items.length === 0 || all.length >= r.total) break;
+      }
+      const rows = all.map((l) => ({
+        time: new Date(l.created_at).toLocaleString('en-LK', { dateStyle: 'medium', timeStyle: 'short' }),
+        user: userLabel(l),
+        email: l.user_email || '',
+        action: actionLabel(l.action),
+        description: describeLog(l),
+        application: l.entity_ref || '',
+        method: l.method,
+        route: l.route,
+        status: l.status_code != null ? String(l.status_code) : l.success ? 'OK' : 'Error',
+        ip: l.ip_address || '',
+      }));
+      const parts = [
+        search && `search "${search}"`,
+        action && `action ${actionLabel(action)}`,
+        serial && `application ${serial}`,
+        dateFrom && `from ${dateFrom}`,
+        dateTo && `to ${dateTo}`,
+      ].filter(Boolean);
+      await exportLogsExcel(rows, { filterNote: parts.length ? parts.join(', ') : 'All logs' });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
@@ -134,10 +175,18 @@ export function LogsPanel({ serial: initialSerial }: Props) {
             </p>
           </div>
         </div>
-        <button onClick={load}
-          className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-amber-500' : ''}`} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={exportExcel} disabled={exporting || loading || total === 0}
+            title="Export the current filter selection to Excel"
+            className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 shadow-sm hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50">
+            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            {exporting ? 'Exporting…' : 'Export Excel'}
+          </button>
+          <button onClick={load}
+            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-amber-500' : ''}`} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
