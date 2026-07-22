@@ -9,23 +9,65 @@ import { logsApi, ActionLog } from '@/lib/logs-api';
 
 // Human-readable "what happened" for each recorded action code.
 const ACTION_LABELS: Record<string, string> = {
-  'application.create':         'Created application',
-  'application.submit':         'Submitted application',
-  'application.exam_review':    'Exam Division review',
-  'application.payment_review': 'Finance payment review',
-  'application.rollback':       'Rolled back status',
-  'application.cancel':         'Cancelled application',
-  'auth.login':                 'Signed in',
-  'document.post':              'Uploaded document',
-  'document.delete':            'Deleted document',
-  'user.post':                  'Created staff user',
-  'user.patch':                 'Updated staff user',
-  'user.delete':                'Deleted staff user',
+  'application.create':            'Created application',
+  'application.submit':            'Submitted application',
+  'application.resubmit':          'Resubmitted application',
+  'application.cancel':            'Cancelled application',
+  'application.exam_review':       'Exam Division review',
+  'application.subject_decline':   'Declined a subject',
+  'application.payment_review':    'Finance payment review',
+  'application.final_approve':     'Final approval',
+  'application.final_approve_bulk':'Bulk final approval',
+  'application.final_reject':      'Final rejection',
+  'application.rollback':          'Rolled back status',
+  'application.admission_printed': 'Marked admission printed',
+  'document.upload':               'Uploaded document',
+  'document.delete':               'Deleted document',
+  'auth.login':                    'Signed in',
+  'auth.password_reset_request':   'Requested password reset',
+  'auth.password_reset_verify':    'Verified reset code',
+  'auth.password_reset':           'Reset password',
+  'user.create':                   'Created staff user',
+  'user.update':                   'Updated staff user',
+  'user.delete':                   'Deleted staff user',
+  'user.activate':                 'Reactivated staff user',
+  'schedule.publish':              'Published exam schedule',
+  'schedule.unpublish':            'Unpublished exam schedule',
+  'schedule.apply_toggle':         'Toggled applications open/closed',
+  'schedule.import':               'Imported exam timetable',
+  'scheduled_exam.create':         'Added an exam to a schedule',
+  'student.import':                'Imported students',
+  'student_profile.update':        'Updated own profile',
+  // Legacy codes from before the interceptor was updated.
+  'document.post':                 'Uploaded document',
+  'user.post':                     'Created staff user',
+  'user.patch':                    'Updated staff user',
+};
+
+// Verb (last code segment) → past-tense word for the fallback label.
+const VERB_WORD: Record<string, string> = {
+  create: 'Created', update: 'Updated', delete: 'Deleted',
+  post: 'Created', patch: 'Updated', put: 'Updated',
+};
+// Resource (segment before the verb) → readable noun.
+const RESOURCE_WORD: Record<string, string> = {
+  user: 'staff user', programme: 'programme', subject: 'subject', batch: 'batch',
+  schedule: 'exam schedule', scheduled_exam: 'exam timetable row',
+  exam_staff: 'exam staff', exam_location: 'exam location', student: 'student',
+  application: 'application', document: 'document',
 };
 
 function actionLabel(action: string): string {
   if (ACTION_LABELS[action]) return ACTION_LABELS[action];
-  // Fallback: prettify "resource.verb" → "Resource verb".
+  // Fallback for unmapped codes (incl. old ones): treat the LAST segment as the
+  // verb and the one before it as the resource, so nothing shows raw "post/patch".
+  const parts = action.split('.');
+  const v = parts[parts.length - 1];
+  const res = parts[parts.length - 2] ?? '';
+  if (VERB_WORD[v]) {
+    const noun = RESOURCE_WORD[res] ?? res.replace(/[-_]/g, ' ');
+    return `${VERB_WORD[v]}${noun ? ` ${noun}` : ''}`;
+  }
   const nice = action.replace(/[._]/g, ' ').trim();
   return nice.charAt(0).toUpperCase() + nice.slice(1);
 }
@@ -33,9 +75,14 @@ function actionLabel(action: string): string {
 // A full sentence describing what happened, for the Description column.
 function describeLog(l: ActionLog): string {
   let s = actionLabel(l.action);
-  if (l.entity === 'application' && l.entity_ref) s += ` on application ${l.entity_ref}`;
-  if (!l.success) s += ` — failed${l.status_code ? ` (${l.status_code})` : ''}`;
+  if (l.entity === 'application' && l.entity_ref) s += ` — application ${l.entity_ref}`;
+  if (!l.success) s += ` · failed${l.status_code ? ` (${l.status_code})` : ''}`;
   return s;
+}
+
+// Best-effort actor label for the User column.
+function userLabel(l: ActionLog): string {
+  return l.user_name || l.user_email || (l.action === 'auth.login' ? 'Unknown (failed sign-in)' : 'System');
 }
 
 interface Props { serial?: string }
@@ -110,7 +157,7 @@ export function LogsPanel({ serial: initialSerial }: Props) {
         <select value={action} onChange={(e) => setAction(e.target.value)}
           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm focus:outline-none">
           <option value="">All actions</option>
-          {actionOptions.map((a) => <option key={a} value={a}>{a}</option>)}
+          {actionOptions.map((a) => <option key={a} value={a}>{actionLabel(a)}</option>)}
         </select>
 
         <div className="flex items-center gap-1">
@@ -165,7 +212,7 @@ export function LogsPanel({ serial: initialSerial }: Props) {
                     {new Date(l.created_at).toLocaleString('en-LK', { dateStyle: 'medium', timeStyle: 'short' })}
                   </td>
                   <td className="px-4 py-2.5">
-                    <p className="text-xs font-semibold text-slate-800 dark:text-gray-200">{l.user_name || l.user_email || '—'}</p>
+                    <p className="text-xs font-semibold text-slate-800 dark:text-gray-200">{userLabel(l)}</p>
                     {l.user_name && l.user_email && <p className="text-[10px] text-slate-400">{l.user_email}</p>}
                   </td>
                   <td className="whitespace-nowrap px-4 py-2.5" title={l.action}>
