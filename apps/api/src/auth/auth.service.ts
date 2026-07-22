@@ -57,9 +57,12 @@ export class AuthService {
         data: {
           email: student.email || `${student.batchNumber.replace(/\s+/g, '')}-${student.nic}@student.local`.toLowerCase(),
           password: null,
+          lastLoginAt: new Date(),
           student: { connect: { id: student.id } },
         },
       });
+    } else {
+      await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     }
 
     return this.generateAuthTokens(user, student.fullName);
@@ -85,6 +88,8 @@ export class AuthService {
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
     return this.generateAuthTokens(user, user.staffUser?.name);
   }

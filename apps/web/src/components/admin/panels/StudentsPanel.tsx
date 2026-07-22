@@ -159,6 +159,7 @@ export function StudentsPanel({ onNavigate }: Props) {
         { header: 'Telephone',       get: (s) => s.telephone || '' },
         { header: 'Permanent Address', get: (s) => s.permanentAddress || '' },
         { header: 'Postal Address',  get: (s) => s.postalAddress || '' },
+        { header: 'Last Login',      get: (s) => (s.lastLoginAt ? fmtDateTime(s.lastLoginAt) : 'Never') },
       ];
       const rows = all.items.map((s) => Object.fromEntries(COLS.map((c) => [c.header, c.get(s)])));
       const ws = XLSX.utils.json_to_sheet(rows, { header: COLS.map((c) => c.header) });
@@ -251,6 +252,7 @@ export function StudentsPanel({ onNavigate }: Props) {
                   <th className="px-4 py-3 font-medium">Batch</th>
                   <th className="px-4 py-3 font-medium">Intake</th>
                   <th className="px-4 py-3 font-medium">Contact</th>
+                  <th className="px-4 py-3 font-medium">Last Login</th>
                 </tr>
               </thead>
               <tbody>
@@ -268,6 +270,7 @@ export function StudentsPanel({ onNavigate }: Props) {
                     </td>
                     <td className="px-4 py-3 text-slate-600">{s.intake}</td>
                     <td className="px-4 py-3 text-slate-600">{s.mobile || '—'}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{s.lastLoginAt ? fmtDateTime(s.lastLoginAt) : 'Never'}</td>
                   </tr>
                 ))}
               </tbody>

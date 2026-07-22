@@ -636,11 +636,14 @@ export class AdminService {
           nameWithInitials: true, title: true, gender: true, email: true,
           mobile: true, telephone: true, permanentAddress: true, postalAddress: true,
           batchNumber: true, intake: true,
+          user: { select: { lastLoginAt: true } },
         },
       }),
       this.prisma.student.count({ where }),
     ]);
-    return { items, total };
+    // Flatten the account's last-login time onto each student row.
+    const flat = items.map(({ user, ...s }) => ({ ...s, lastLoginAt: user?.lastLoginAt ?? null }));
+    return { items: flat, total };
   }
 
   /* ════════════════ Students (CRUD) ════════════════ */

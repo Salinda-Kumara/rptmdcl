@@ -129,6 +129,7 @@ export interface AdminStudent {
   postalAddress?: string;
   batchNumber: string;
   intake: string;
+  lastLoginAt?: string | null;
 }
 
 export interface ImportResult {

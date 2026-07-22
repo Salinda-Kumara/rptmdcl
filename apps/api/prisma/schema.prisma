@@ -17,6 +17,7 @@ model User {
   email     String   @unique
   password  String?  // null for students who use batch/NIC
   isAdmin   Boolean  @default(false) // Master Admin — full access bypass
+  lastLoginAt DateTime? // updated on each successful login
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
