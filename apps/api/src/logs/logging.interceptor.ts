@@ -105,6 +105,11 @@ export class LoggingInterceptor implements NestInterceptor {
     const routePath: string = req.route?.path ? `${req.baseUrl || ''}${req.route.path}` : req.originalUrl;
     const { action, entity } = describe(method, req.originalUrl || routePath);
 
+    // Token refresh isn't a user action — it fires silently and repeatedly in
+    // the background with no authenticated actor yet, so it only ever shows
+    // up as noisy "System" entries. Skip logging it entirely.
+    if (action === 'auth.refresh') return next.handle();
+
     const ipAddress =
       (req.headers?.['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress || null;
     const userAgent = (req.headers?.['user-agent'] as string) || null;
