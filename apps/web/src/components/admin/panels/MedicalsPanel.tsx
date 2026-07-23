@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { exportMedicalsExcel } from '@/lib/export-medicals';
 import { medicalsApi, MedicalSubmission, MEDICAL_STATUS_LABELS, MEDICAL_STATUS_COLORS } from '@/lib/medicals-api';
-import { staffApi } from '@/lib/staff-api';
 import apiClient from '@/lib/api-client';
 import { useMyPermissions, can } from '@/lib/permissions';
 import { fmtDateTime } from '@/lib/applications-api';

@@ -12,7 +12,6 @@ const fmtDay = (d: string) => new Date(d).toLocaleDateString('en-LK', { weekday:
 
 export default function NewMedicalSubmissionPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
   const [eligible, setEligible] = useState<EligibleExam[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,7 +27,6 @@ export default function NewMedicalSubmissionPage() {
   useEffect(() => {
     Promise.all([
       studentsApi.getProfile().then((p: any) => {
-        setProfile(p);
         setPermanentAddress(p.permanentAddress ?? '');
         setContactNumbers([p.mobile, p.telephone].filter(Boolean).join(' / '));
       }),
