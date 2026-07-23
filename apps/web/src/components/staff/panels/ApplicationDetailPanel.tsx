@@ -234,9 +234,14 @@ export function ApplicationDetailPanel({ id, onBack, onViewLogs }: Props) {
   // Declined subjects don't need verification and can't be forwarded — only
   // ACTIVE subjects count toward the checklist.
   const subjKeys = (app?.applicationSubjects ?? []).filter((s: any) => s.status !== 'DECLINED').map((s: any) => `s_${s.id}`);
-  // Medical certificates are shown under their subject, so the flat Attachments
-  // list (and its verification count) covers everything else — e.g. the pay slip.
-  const attachmentDocs = (app?.documents ?? []).filter((d) => d.documentType !== 'MEDICAL_CERTIFICATE');
+  // Medical certificates linked to a subject are shown under that subject, so the
+  // flat Attachments list (and its verification count) covers everything else —
+  // e.g. the pay slip. A medical cert WITHOUT a subject link (e.g. one the student
+  // re-uploaded when resubmitting a returned application) has no subject to sit
+  // under, so it falls into this flat list too — otherwise staff never see it.
+  const attachmentDocs = (app?.documents ?? []).filter(
+    (d) => d.documentType !== 'MEDICAL_CERTIFICATE' || !d.applicationSubjectId,
+  );
   const docKeys  = attachmentDocs.map((d) => `d_${d.id}`);
   // Per-subject medical certificates, grouped by the subject they belong to.
   const docsBySubject = new Map<string, any[]>();
